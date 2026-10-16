@@ -1,0 +1,628 @@
+<title>Suivi des mailles</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Outil de travail : bandeau de synthèse au-dessus, liste filtrable en dessous, tout aligné sur une grille unique. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6779;
+  --line: #dde1e8;
+  --line-strong: #c4cad4;
+  --focus: #2f5bd3;
+  --nouveau: #1f5fd1;   --nouveau-bg: #e6eefc;
+  --legitime: #1d7a45;  --legitime-bg: #e3f3e9;
+  --nonleg: #c0322b;    --nonleg-bg: #fbe8e6;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2a323e; --line-strong: #3a4452; --focus: #7ea2ff;
+    --nouveau: #7ea8ff; --nouveau-bg: #1c2b4a; --legitime: #5fcf8d; --legitime-bg: #173426; --nonleg: #ff8a80; --nonleg-bg: #42201e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2a323e; --line-strong: #3a4452; --focus: #7ea2ff;
+  --nouveau: #7ea8ff; --nouveau-bg: #1c2b4a; --legitime: #5fcf8d; --legitime-bg: #173426; --nonleg: #ff8a80; --nonleg-bg: #42201e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45;
+  margin: 0;
+}
+.page {
+  max-width: 1100px; margin: 0 auto;
+  padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px;
+}
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 2px 0 0; }
+.demo-badge {
+  font-size: 12px; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 4px; padding: 2px 8px;
+  display: inline-flex; gap: 8px; align-items: center;
+}
+
+/* Bandeau de synthèse */
+.synthese { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 12px; }
+.synthese-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.synthese-tete strong { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.total { font-variant-numeric: tabular-nums; color: var(--muted); }
+.barre { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.barre span { transition: flex-grow .25s ease; min-width: 0; }
+.barre .nouveau { background: var(--nouveau); }
+.barre .legitime { background: var(--legitime); }
+.barre .non_legitime { background: var(--nonleg); }
+.compteurs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.compteur {
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
+  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center;
+}
+.compteur:hover { border-color: var(--line-strong); }
+.compteur[aria-pressed="true"] { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+.compteur .pastille { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.compteur .lib { font-weight: 500; color: var(--fg); }
+.compteur .nb { grid-column: 2; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.compteur .pct { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.compteur.nouveau { color: var(--nouveau); }
+.compteur.legitime { color: var(--legitime); }
+.compteur.non_legitime { color: var(--nonleg); }
+
+/* Liste */
+.liste { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.liste-tete { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.affiches { color: var(--muted); font-variant-numeric: tabular-nums; }
+.btn {
+  font: inherit; font-size: 13px; color: var(--fg); background: transparent; cursor: pointer;
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 4px 10px;
+}
+.btn:hover { background: var(--bg); }
+.btn:disabled { opacity: .45; cursor: default; background: transparent; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; border-bottom: 0; padding-bottom: 4px; }
+thead tr.filtres th { padding-top: 0; padding-bottom: 10px; border-bottom: 1px solid var(--line-strong); }
+.filtre {
+  width: 100%; font: inherit; font-size: 13px; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px;
+}
+.filtre:focus, .statut:focus-visible, .btn:focus-visible, .compteur:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+tbody tr:hover td { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+tbody tr:last-child td { border-bottom: 0; }
+td.siren, td.maille { font-family: var(--font-data); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.societe { font-weight: 500; }
+mark { background: color-mix(in srgb, var(--nouveau) 22%, transparent); color: inherit; border-radius: 2px; }
+.col-statut { width: 180px; }
+
+select.statut {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; appearance: none; -webkit-appearance: none;
+  border: 1px solid transparent; border-radius: 999px; padding: 3px 28px 3px 12px; width: 100%;
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 10px 6px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%);
+  background-size: 5px 5px, 5px 5px; background-position: right 14px center, right 9px center;
+}
+select.statut.nouveau { color: var(--nouveau); background-color: var(--nouveau-bg); border-color: color-mix(in srgb, var(--nouveau) 35%, transparent); }
+select.statut.legitime { color: var(--legitime); background-color: var(--legitime-bg); border-color: color-mix(in srgb, var(--legitime) 35%, transparent); }
+select.statut.non_legitime { color: var(--nonleg); background-color: var(--nonleg-bg); border-color: color-mix(in srgb, var(--nonleg) 35%, transparent); }
+select.statut option { color: var(--fg); background: var(--surface); }
+select.statut[aria-busy="true"] { opacity: .6; }
+
+.vide { padding: 32px 16px; text-align: center; color: var(--muted); }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px;
+  max-width: calc(100% - 32px);
+}
+@media (max-width: 560px) {
+  .compteurs { grid-template-columns: 1fr; }
+  .compteur .nb { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .barre span { transition: none; } }
+
+</style>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>Suivi des mailles</h1>
+      <p class="sub">Qualification des mailles par société : chaque maille part en « Nouveau » et doit être déclarée légitime ou non.</p>
+    </div>
+    <span id="demo" class="demo-badge" hidden>Données de démonstration, enregistrées dans ce navigateur
+      <button id="reinit" class="btn" type="button">Réinitialiser</button>
+    </span>
+  </header>
+
+  <section class="synthese" aria-label="Nombre de mailles par statut">
+    <div class="synthese-tete">
+      <strong>Répartition par statut</strong>
+      <span id="total" class="total"></span>
+    </div>
+    <div class="barre" aria-hidden="true">
+      <span class="nouveau"></span><span class="legitime"></span><span class="non_legitime"></span>
+    </div>
+    <div class="compteurs">
+      <button type="button" class="compteur nouveau" data-statut="nouveau" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">Nouveau</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur legitime" data-statut="legitime" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">Légitime</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur non_legitime" data-statut="non_legitime" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">Non légitime</span><span class="nb">–</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="liste" aria-label="Liste des mailles">
+    <div class="liste-tete">
+      <span id="affiches" class="affiches">Chargement…</span>
+      <button id="effacer" class="btn" type="button" disabled>Effacer les filtres</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Société</th><th scope="col">SIREN</th><th scope="col">Maille</th><th scope="col" class="col-statut">Statut</th></tr>
+          <tr class="filtres">
+            <th><input id="f-societe" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
+            <th><input id="f-siren" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par SIREN" inputmode="numeric" autocomplete="off"></th>
+            <th><input id="f-maille" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par maille" autocomplete="off"></th>
+            <th>
+              <select id="f-statut" class="filtre" aria-label="Filtrer par statut">
+                <option value="">Tous</option>
+                <option value="nouveau">Nouveau</option>
+                <option value="legitime">Légitime</option>
+                <option value="non_legitime">Non légitime</option>
+              </select>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="lignes"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<script>window.SUIVI_DEMO_DATA = [
+  {
+    "id": "0001",
+    "societe": "Atlantique Logistique",
+    "siren": "357231950",
+    "maille": "NOR-LEHAVRE",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0002",
+    "societe": "Atlantique Logistique",
+    "siren": "357231950",
+    "maille": "IDF-SUD",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0003",
+    "societe": "Atlantique Logistique",
+    "siren": "357231950",
+    "maille": "ARA-LYON",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0004",
+    "societe": "Transports Kerlan",
+    "siren": "213185879",
+    "maille": "NAQ-BORDEAUX",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0005",
+    "societe": "Transports Kerlan",
+    "siren": "213185879",
+    "maille": "IDF-SUD",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0006",
+    "societe": "Rhône Fret Services",
+    "siren": "442009973",
+    "maille": "ARA-LYON",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0007",
+    "societe": "Rhône Fret Services",
+    "siren": "442009973",
+    "maille": "OCC-SETE",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0008",
+    "societe": "Rhône Fret Services",
+    "siren": "442009973",
+    "maille": "BRE-RENNES",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0009",
+    "societe": "Docks de Gennevilliers",
+    "siren": "630514313",
+    "maille": "BFC-DIJON",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0010",
+    "societe": "Docks de Gennevilliers",
+    "siren": "630514313",
+    "maille": "NAQ-BORDEAUX",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0011",
+    "societe": "Normandie Transit",
+    "siren": "471591636",
+    "maille": "PACA-FOS",
+    "statut": "legitime"
+  },
+  {
+    "id": "0012",
+    "societe": "Normandie Transit",
+    "siren": "471591636",
+    "maille": "HDF-LILLE",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0013",
+    "societe": "Normandie Transit",
+    "siren": "471591636",
+    "maille": "ARA-LYON",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0014",
+    "societe": "Agence Maritime Sud",
+    "siren": "163255193",
+    "maille": "ARA-LYON",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0015",
+    "societe": "Agence Maritime Sud",
+    "siren": "163255193",
+    "maille": "NOR-LEHAVRE",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0016",
+    "societe": "Agence Maritime Sud",
+    "siren": "163255193",
+    "maille": "OCC-SETE",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0017",
+    "societe": "Fret Rail Lorraine",
+    "siren": "949378756",
+    "maille": "NAQ-BORDEAUX",
+    "statut": "legitime"
+  },
+  {
+    "id": "0018",
+    "societe": "Fret Rail Lorraine",
+    "siren": "949378756",
+    "maille": "NOR-LEHAVRE",
+    "statut": "legitime"
+  },
+  {
+    "id": "0019",
+    "societe": "Fret Rail Lorraine",
+    "siren": "949378756",
+    "maille": "BRE-RENNES",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0020",
+    "societe": "Fret Rail Lorraine",
+    "siren": "949378756",
+    "maille": "PDL-NANTES",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0021",
+    "societe": "Entrepôts du Val d'Oise",
+    "siren": "407349141",
+    "maille": "BRE-RENNES",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0022",
+    "societe": "Entrepôts du Val d'Oise",
+    "siren": "407349141",
+    "maille": "HDF-LILLE",
+    "statut": "legitime"
+  },
+  {
+    "id": "0023",
+    "societe": "Comptoir Portuaire de Sète",
+    "siren": "904851417",
+    "maille": "BRE-RENNES",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0024",
+    "societe": "Comptoir Portuaire de Sète",
+    "siren": "904851417",
+    "maille": "IDF-NORD",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0025",
+    "societe": "Comptoir Portuaire de Sète",
+    "siren": "904851417",
+    "maille": "OCC-SETE",
+    "statut": "legitime"
+  },
+  {
+    "id": "0026",
+    "societe": "Comptoir Portuaire de Sète",
+    "siren": "904851417",
+    "maille": "NOR-LEHAVRE",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0027",
+    "societe": "Alpes Messagerie",
+    "siren": "291657138",
+    "maille": "NOR-LEHAVRE",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0028",
+    "societe": "Alpes Messagerie",
+    "siren": "291657138",
+    "maille": "HDF-LILLE",
+    "statut": "legitime"
+  },
+  {
+    "id": "0029",
+    "societe": "Garonne Distribution",
+    "siren": "554323444",
+    "maille": "BRE-RENNES",
+    "statut": "legitime"
+  },
+  {
+    "id": "0030",
+    "societe": "Garonne Distribution",
+    "siren": "554323444",
+    "maille": "IDF-SUD",
+    "statut": "nouveau"
+  },
+  {
+    "id": "0031",
+    "societe": "Ouest Conteneurs",
+    "siren": "335189973",
+    "maille": "NAQ-BORDEAUX",
+    "statut": "non_legitime"
+  },
+  {
+    "id": "0032",
+    "societe": "Ouest Conteneurs",
+    "siren": "335189973",
+    "maille": "HDF-LILLE",
+    "statut": "legitime"
+  }
+];</script>
+<script>
+(() => {
+  "use strict";
+
+  const STATUTS = [
+    { code: "nouveau", libelle: "Nouveau" },
+    { code: "legitime", libelle: "Légitime" },
+    { code: "non_legitime", libelle: "Non légitime" },
+  ];
+  const libelleStatut = Object.fromEntries(STATUTS.map(s => [s.code, s.libelle]));
+
+  // --- Accès aux données -------------------------------------------------
+  // En production (IIS) : API du serveur applicatif. Chemin relatif pour fonctionner aussi
+  // dans une sous-application IIS (ex. https://serveur/suivimailles/).
+  const apiStore = {
+    demo: false,
+    async lister() {
+      const r = await fetch("api/mailles", { headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error(`Chargement impossible (HTTP ${r.status})`);
+      return r.json();
+    },
+    async changerStatut(id, statut) {
+      const r = await fetch(`api/mailles/${encodeURIComponent(id)}/statut`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statut }),
+      });
+      if (!r.ok) throw new Error(`Enregistrement refusé par le serveur (HTTP ${r.status})`);
+      return r.json();
+    },
+  };
+
+  // En démonstration (artefact de test) : données embarquées, modifications gardées dans ce navigateur.
+  const CLE = "suivimailles-demo-v1";
+  const demoStore = {
+    demo: true,
+    _donnees: null,
+    async lister() {
+      let sauvees = null;
+      try { sauvees = JSON.parse(localStorage.getItem(CLE) || "null"); } catch { /* stockage indisponible */ }
+      const base = structuredClone(window.SUIVI_DEMO_DATA || []);
+      if (sauvees) for (const m of base) if (sauvees[m.id]) m.statut = sauvees[m.id];
+      this._donnees = base;
+      return structuredClone(base);
+    },
+    async changerStatut(id, statut) {
+      const m = this._donnees.find(x => x.id === id);
+      m.statut = statut;
+      try {
+        const sauvees = JSON.parse(localStorage.getItem(CLE) || "{}");
+        sauvees[id] = statut;
+        localStorage.setItem(CLE, JSON.stringify(sauvees));
+      } catch { /* la modification reste valable jusqu'au rechargement */ }
+      return structuredClone(m);
+    },
+    reinitialiser() {
+      try { localStorage.removeItem(CLE); } catch { /* rien à faire */ }
+    },
+  };
+
+  const store = window.SUIVI_DEMO_DATA ? demoStore : apiStore;
+
+  // --- État ---------------------------------------------------------------
+  const etat = { mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" } };
+
+  const $ = sel => document.querySelector(sel);
+  const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const sansEspaces = s => norm(s).replace(/\s+/g, "");
+  const formatSiren = s => String(s).replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3");
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function surligner(texte, filtre, ignorerEspaces = false) {
+    const t = String(texte);
+    const f = ignorerEspaces ? sansEspaces(filtre) : norm(filtre);
+    if (!f) return esc(t);
+    // Correspondance insensible aux accents : on cherche sur la version normalisée, caractère par caractère.
+    const map = [];
+    let n = "";
+    for (let i = 0; i < t.length; i++) {
+      const c = norm(t[i]);
+      if (ignorerEspaces && /\s/.test(t[i])) continue;
+      for (const ch of c) { n += ch; map.push(i); }
+    }
+    const k = n.indexOf(f);
+    if (k < 0) return esc(t);
+    const debut = map[k], fin = map[k + f.length - 1] + 1;
+    return esc(t.slice(0, debut)) + "<mark>" + esc(t.slice(debut, fin)) + "</mark>" + esc(t.slice(fin));
+  }
+
+  const correspond = (m, f) =>
+    norm(m.societe).includes(norm(f.societe)) &&
+    sansEspaces(m.siren).includes(sansEspaces(f.siren)) &&
+    norm(m.maille).includes(norm(f.maille));
+
+  // --- Rendu ----------------------------------------------------------------
+  function rendre() {
+    const f = etat.filtres;
+    // La synthèse suit les filtres de colonnes (société, SIREN, maille) mais pas le filtre de statut,
+    // pour toujours voir la répartition complète du périmètre filtré.
+    const perimetre = etat.mailles.filter(m => correspond(m, f));
+    const visibles = f.statut ? perimetre.filter(m => m.statut === f.statut) : perimetre;
+
+    const total = perimetre.length;
+    $("#total").textContent = `${total} maille${total > 1 ? "s" : ""}${total !== etat.mailles.length ? ` sur ${etat.mailles.length}` : ""}`;
+    for (const s of STATUTS) {
+      const nb = perimetre.filter(m => m.statut === s.code).length;
+      const btn = $(`.compteur.${s.code}`);
+      btn.querySelector(".nb").innerHTML = `${nb}<span class="pct">${total ? Math.round(nb * 100 / total) : 0} %</span>`;
+      btn.setAttribute("aria-pressed", String(f.statut === s.code));
+      $(`.barre .${s.code}`).style.flexGrow = nb;
+    }
+
+    $("#affiches").textContent = `${visibles.length} ligne${visibles.length > 1 ? "s" : ""} affichée${visibles.length > 1 ? "s" : ""}`;
+    $("#effacer").disabled = !Object.values(f).some(Boolean);
+
+    const tbody = $("#lignes");
+    if (!visibles.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="vide">${etat.mailles.length ? "Aucune maille ne correspond aux filtres." : "Aucune maille à afficher."}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = visibles.map(m => `
+      <tr data-id="${esc(m.id)}">
+        <td class="societe">${surligner(m.societe, f.societe)}</td>
+        <td class="siren">${surligner(formatSiren(m.siren), f.siren, true)}</td>
+        <td class="maille">${surligner(m.maille, f.maille)}</td>
+        <td>
+          <select class="statut ${esc(m.statut)}" aria-label="Statut de ${esc(m.maille)} – ${esc(m.societe)}">
+            ${STATUTS.map(s => `<option value="${s.code}"${s.code === m.statut ? " selected" : ""}>${s.libelle}</option>`).join("")}
+          </select>
+        </td>
+      </tr>`).join("");
+  }
+
+  function toast(message) {
+    const t = $("#toast");
+    t.textContent = message;
+    t.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  // --- Événements -----------------------------------------------------------
+  for (const champ of ["societe", "siren", "maille"]) {
+    $(`#f-${champ}`).addEventListener("input", e => { etat.filtres[champ] = e.target.value; rendre(); });
+  }
+  $("#f-statut").addEventListener("change", e => { etat.filtres.statut = e.target.value; rendre(); });
+
+  $(".compteurs").addEventListener("click", e => {
+    const btn = e.target.closest(".compteur");
+    if (!btn) return;
+    const code = btn.dataset.statut;
+    etat.filtres.statut = etat.filtres.statut === code ? "" : code;
+    $("#f-statut").value = etat.filtres.statut;
+    rendre();
+  });
+
+  $("#effacer").addEventListener("click", () => {
+    etat.filtres = { societe: "", siren: "", maille: "", statut: "" };
+    for (const id of ["f-societe", "f-siren", "f-maille", "f-statut"]) $(`#${id}`).value = "";
+    rendre();
+  });
+
+  $("#lignes").addEventListener("change", async e => {
+    const sel = e.target.closest("select.statut");
+    if (!sel) return;
+    const id = sel.closest("tr").dataset.id;
+    const maille = etat.mailles.find(m => m.id === id);
+    const ancien = maille.statut;
+    const nouveau = sel.value;
+
+    // Mise à jour immédiate, annulée si le serveur refuse.
+    maille.statut = nouveau;
+    sel.className = `statut ${nouveau}`;
+    sel.setAttribute("aria-busy", "true");
+    try {
+      const maj = await store.changerStatut(id, nouveau);
+      Object.assign(maille, maj);
+      toast(`${maille.maille} (${maille.societe}) : ${libelleStatut[nouveau]}`);
+    } catch (err) {
+      maille.statut = ancien;
+      toast(`${err.message}. Le statut reste « ${libelleStatut[ancien]} ».`);
+    }
+    rendre();
+  });
+
+  if (store.demo) {
+    $("#demo").hidden = false;
+    $("#reinit").addEventListener("click", async () => {
+      demoStore.reinitialiser();
+      await charger();
+      toast("Données de démonstration réinitialisées");
+    });
+  }
+
+  // --- Démarrage -------------------------------------------------------------
+  async function charger() {
+    try {
+      etat.mailles = await store.lister();
+    } catch (err) {
+      $("#lignes").innerHTML = `<tr><td colspan="4" class="vide">${esc(err.message)}. Vérifiez que le site IIS est démarré puis rechargez la page.</td></tr>`;
+      return;
+    }
+    etat.mailles.sort((a, b) => a.societe.localeCompare(b.societe, "fr") || a.maille.localeCompare(b.maille, "fr"));
+    rendre();
+  }
+  charger();
+})();
+
+</script>

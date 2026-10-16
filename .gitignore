@@ -1,0 +1,7 @@
+bin/
+obj/
+publish/
+.vs/
+*.user
+src/SuiviMailles/App_Data/
+src/SuiviMailles/logs/

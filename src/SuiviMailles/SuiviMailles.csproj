@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SuiviMailles</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Jeu de données initial : copié vers le fichier de stockage uniquement s'il n'existe pas encore.
+         Le fichier de stockage lui-même n'est jamais publié, un redéploiement ne peut donc pas écraser les statuts saisis. -->
+    <None Update="Data\mailles.seed.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
