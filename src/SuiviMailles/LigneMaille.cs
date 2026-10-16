@@ -23,3 +23,11 @@ public static class Statuts
 }
 
 public sealed record ChangementStatut([property: JsonPropertyName("statut")] string Statut);
+
+public sealed record LigneImport(int Numero, string Siren, string Maille);
+
+public sealed record DemandeImport(IReadOnlyList<LigneImport> Lignes);
+
+public sealed record Rejet(int Numero, string Raison);
+
+public sealed record ResultatImport(IReadOnlyList<LigneMaille> Ajoutees, int DejaPresentes, IReadOnlyList<Rejet> Rejets);

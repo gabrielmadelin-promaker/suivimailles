@@ -21,6 +21,12 @@
     </span>
   </header>
 
+  <nav class="onglets" role="tablist" aria-label="Sections">
+    <button type="button" class="onglet" role="tab" data-onglet="mailles" aria-controls="panneau-mailles" aria-selected="true">Mailles</button>
+    <button type="button" class="onglet" role="tab" data-onglet="import" aria-controls="panneau-import" aria-selected="false">Import / export</button>
+  </nav>
+
+  <div id="panneau-mailles" role="tabpanel" class="panneau">
   <section class="synthese" aria-label="Nombre de mailles par statut">
     <div class="synthese-tete">
       <strong>Répartition par statut</strong>
@@ -69,6 +75,44 @@
       </table>
     </div>
   </section>
+  </div>
+
+  <div id="panneau-import" role="tabpanel" class="panneau" hidden>
+    <section class="carte">
+      <div class="carte-tete">
+        <h2>Exporter les SIREN</h2>
+        <p class="sub" id="nb-siren"></p>
+      </div>
+      <div class="actions">
+        <button id="exporter" class="btn principal" type="button">Exporter siren.csv</button>
+      </div>
+      <div id="apercu-export" hidden>
+        <label for="contenu-export" class="sub">Contenu de siren.csv</label>
+        <textarea id="contenu-export" rows="6" readonly></textarea>
+      </div>
+    </section>
+
+    <section class="carte">
+      <div class="carte-tete">
+        <h2>Importer les adresses de facturation</h2>
+        <p class="sub">Fichier <code>adresses_de_facturation.csv</code>. Les mailles absentes de la liste sont ajoutées au statut « Nouveau » ; celles déjà présentes gardent leur statut.</p>
+      </div>
+      <div class="modele" aria-label="Colonnes attendues">
+        <span class="col utile">SIREN</span><span class="col">non utilisée</span><span class="col">non utilisée</span><span class="col utile">Maille</span><span class="col">non utilisée</span>
+      </div>
+      <div class="actions">
+        <label class="btn" for="fichier">Choisir le fichier…</label>
+        <input id="fichier" class="visuellement-cache" type="file" accept=".csv,text/csv">
+        <span id="fichier-info" class="sub">Aucun fichier choisi.</span>
+        <button id="importer" class="btn principal" type="button" disabled>Importer</button>
+      </div>
+      <div id="resultat-import" class="resultat" hidden>
+        <div id="resultat-chiffres" class="chiffres"></div>
+        <div id="resultat-ajoutees" class="table-wrap"></div>
+        <div id="resultat-rejets"></div>
+      </div>
+    </section>
+  </div>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 <!-- CORPS:FIN -->

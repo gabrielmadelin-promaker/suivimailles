@@ -27,30 +27,61 @@
       if (!r.ok) throw new Error(`Enregistrement refusé par le serveur (HTTP ${r.status})`);
       return r.json();
     },
+    async importer(lignes) {
+      const r = await fetch("api/mailles/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lignes }),
+      });
+      if (!r.ok) throw new Error(`Import refusé par le serveur (HTTP ${r.status})`);
+      return r.json();
+    },
   };
 
   // En démonstration (artefact de test) : données embarquées, modifications gardées dans ce navigateur.
-  const CLE = "suivimailles-demo-v1";
+  const CLE = "suivimailles-demo-v2";
   const demoStore = {
     demo: true,
-    _donnees: null,
+    _donnees: [],
+    _sauver() {
+      try { localStorage.setItem(CLE, JSON.stringify(this._donnees)); } catch { /* valable jusqu'au rechargement */ }
+    },
     async lister() {
       let sauvees = null;
       try { sauvees = JSON.parse(localStorage.getItem(CLE) || "null"); } catch { /* stockage indisponible */ }
-      const base = structuredClone(window.SUIVI_DEMO_DATA || []);
-      if (sauvees) for (const m of base) if (sauvees[m.id]) m.statut = sauvees[m.id];
-      this._donnees = base;
-      return structuredClone(base);
+      this._donnees = Array.isArray(sauvees) ? sauvees : structuredClone(window.SUIVI_DEMO_DATA || []);
+      return structuredClone(this._donnees);
     },
     async changerStatut(id, statut) {
       const m = this._donnees.find(x => x.id === id);
-      m.statut = statut;
-      try {
-        const sauvees = JSON.parse(localStorage.getItem(CLE) || "{}");
-        sauvees[id] = statut;
-        localStorage.setItem(CLE, JSON.stringify(sauvees));
-      } catch { /* la modification reste valable jusqu'au rechargement */ }
+      Object.assign(m, { statut, modifieLe: new Date().toISOString() });
+      this._sauver();
       return structuredClone(m);
+    },
+    // Même règles que MailleStore.ImporterAsync côté serveur.
+    async importer(lignes) {
+      const cle = (siren, maille) => `${siren}|${maille.trim().toLowerCase()}`;
+      const connues = new Set(this._donnees.map(m => cle(m.siren, m.maille)));
+      let prochainId = Math.max(0, ...this._donnees.map(m => parseInt(m.id, 10) || 0)) + 1;
+      const ajoutees = [], rejets = [];
+      let dejaPresentes = 0;
+      for (const l of lignes) {
+        const siren = String(l.siren).replace(/\s/g, "");
+        const maille = String(l.maille).trim();
+        if (!/^[0-9]{9}$/.test(siren)) { rejets.push({ numero: l.numero, raison: `SIREN invalide « ${l.siren} »` }); continue; }
+        if (!maille) { rejets.push({ numero: l.numero, raison: "Maille vide" }); continue; }
+        if (connues.has(cle(siren, maille))) { dejaPresentes++; continue; }
+        connues.add(cle(siren, maille));
+        const m = {
+          id: String(prochainId++).padStart(4, "0"),
+          societe: this._donnees.find(x => x.siren === siren && x.societe)?.societe ?? "",
+          siren, maille, statut: "nouveau", modifieLe: new Date().toISOString(),
+        };
+        this._donnees.push(m);
+        ajoutees.push(structuredClone(m));
+      }
+      if (ajoutees.length) this._sauver();
+      return { ajoutees, dejaPresentes, rejets };
     },
     reinitialiser() {
       try { localStorage.removeItem(CLE); } catch { /* rien à faire */ }
@@ -63,6 +94,8 @@
   const etat = { mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" } };
 
   const $ = sel => document.querySelector(sel);
+  // Sociétés non renseignées (mailles importées) en fin de liste.
+  const tri = (a, b) => (!a.societe - !b.societe) || a.societe.localeCompare(b.societe, "fr") || a.maille.localeCompare(b.maille, "fr");
   const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   const sansEspaces = s => norm(s).replace(/\s+/g, "");
   const formatSiren = s => String(s).replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3");
@@ -119,7 +152,7 @@
     }
     tbody.innerHTML = visibles.map(m => `
       <tr data-id="${esc(m.id)}">
-        <td class="societe">${surligner(m.societe, f.societe)}</td>
+        <td class="societe">${m.societe ? surligner(m.societe, f.societe) : '<span class="inconnue">Non renseignée</span>'}</td>
         <td class="siren">${surligner(formatSiren(m.siren), f.siren, true)}</td>
         <td class="maille">${surligner(m.maille, f.maille)}</td>
         <td>
@@ -191,6 +224,147 @@
     });
   }
 
+  // --- Onglets ---------------------------------------------------------------
+  function afficherOnglet(nom) {
+    for (const b of document.querySelectorAll(".onglet")) b.setAttribute("aria-selected", String(b.dataset.onglet === nom));
+    for (const p of document.querySelectorAll("[role=tabpanel]")) p.hidden = p.id !== `panneau-${nom}`;
+    if (nom === "import") rendreExport();
+  }
+  document.querySelector(".onglets").addEventListener("click", e => {
+    const b = e.target.closest(".onglet");
+    if (!b) return;
+    afficherOnglet(b.dataset.onglet);
+    try { history.replaceState(null, "", b.dataset.onglet === "import" ? "#import" : "#mailles"); } catch { /* sans importance */ }
+  });
+
+  // --- Export des SIREN ----------------------------------------------------------
+  const sirensDistincts = () => [...new Set(etat.mailles.map(m => m.siren))].sort();
+
+  function rendreExport() {
+    const n = sirensDistincts().length;
+    $("#nb-siren").textContent = `${n} SIREN distinct${n > 1 ? "s" : ""}, un par ligne, sans en-tête.`;
+  }
+
+  $("#exporter").addEventListener("click", async () => {
+    if (!store.demo) {
+      // Le serveur renvoie le fichier en pièce jointe (siren.csv).
+      window.location.href = "api/siren.csv";
+      return;
+    }
+    const contenu = sirensDistincts().map(s => s + "\r\n").join("");
+    const downloads = await window.claude?.use?.("downloads");
+    if (!downloads) {
+      $("#apercu-export").hidden = false;
+      $("#apercu-export textarea").value = contenu;
+      toast("Téléchargement indisponible ici : le contenu de siren.csv est affiché ci-dessous.");
+      return;
+    }
+    try {
+      await downloads.save({ filename: "siren.csv", data: contenu });
+      toast("siren.csv enregistré");
+    } catch (err) {
+      if (err?.code !== "declined") toast("Le fichier n'a pas pu être enregistré.");
+    }
+  });
+
+  // --- Import des adresses de facturation ----------------------------------------
+  // Modèle : SIREN, (non utilisé), (non utilisé), Adresse de facturation = maille, (non utilisé)
+  const COL_SIREN = 0, COL_MAILLE = 3;
+  let lignesLues = null;
+
+  function decoder(buffer) {
+    // Fichier UTF-8 en priorité ; sinon encodage Windows (fichier enregistré depuis Excel).
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(buffer).replace(/^﻿/, ""); }
+    catch { return new TextDecoder("windows-1252").decode(buffer); }
+  }
+
+  function lireCsv(texte) {
+    const premiere = texte.split(/\r?\n/, 1)[0];
+    const sep = premiere.split(";").length > premiere.split(",").length ? ";" : ",";
+    const lignes = [];
+    let champ = "", ligne = [], guillemets = false;
+    for (let i = 0; i < texte.length; i++) {
+      const c = texte[i];
+      if (guillemets) {
+        if (c === '"' && texte[i + 1] === '"') { champ += '"'; i++; }
+        else if (c === '"') guillemets = false;
+        else champ += c;
+      } else if (c === '"') guillemets = true;
+      else if (c === sep) { ligne.push(champ); champ = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && texte[i + 1] === "\n") i++;
+        ligne.push(champ); lignes.push(ligne); ligne = []; champ = "";
+      } else champ += c;
+    }
+    if (champ || ligne.length) { ligne.push(champ); lignes.push(ligne); }
+    return lignes;
+  }
+
+  function extraireLignes(texte) {
+    const brutes = lireCsv(texte);
+    const resultat = [];
+    brutes.forEach((cols, i) => {
+      if (cols.every(c => !c.trim())) return;                       // ligne vide
+      if (i === 0 && !/[0-9]/.test(cols[COL_SIREN] ?? "")) return;   // en-tête
+      let siren = (cols[COL_SIREN] ?? "").replace(/\s/g, "");
+      // Excel supprime les zéros en tête : 55804124 redevient 055804124.
+      if (/^[0-9]{1,8}$/.test(siren)) siren = siren.padStart(9, "0");
+      resultat.push({ numero: i + 1, siren, maille: (cols[COL_MAILLE] ?? "").trim() });
+    });
+    return resultat;
+  }
+
+  $("#fichier").addEventListener("change", async e => {
+    const f = e.target.files[0];
+    $("#resultat-import").hidden = true;
+    lignesLues = null;
+    $("#importer").disabled = true;
+    if (!f) { $("#fichier-info").textContent = "Aucun fichier choisi."; return; }
+    lignesLues = extraireLignes(decoder(await f.arrayBuffer()));
+    $("#fichier-info").textContent = `${f.name} : ${lignesLues.length} ligne${lignesLues.length > 1 ? "s" : ""} de données lue${lignesLues.length > 1 ? "s" : ""}.`;
+    $("#importer").disabled = lignesLues.length === 0;
+  });
+
+  $("#importer").addEventListener("click", async () => {
+    if (!lignesLues?.length) return;
+    const btn = $("#importer");
+    btn.disabled = true;
+    btn.textContent = "Import en cours…";
+    try {
+      const r = await store.importer(lignesLues);
+      etat.mailles.push(...r.ajoutees);
+      etat.mailles.sort(tri);
+      rendre();
+      rendreExport();
+      afficherResultat(r);
+      $("#fichier").value = "";
+      $("#fichier-info").textContent = "Aucun fichier choisi.";
+      lignesLues = null;
+    } catch (err) {
+      toast(`${err.message}. Aucune maille n'a été ajoutée.`);
+      btn.disabled = false;
+    } finally {
+      btn.textContent = "Importer";
+    }
+  });
+
+  function afficherResultat({ ajoutees, dejaPresentes, rejets }) {
+    const pl = (n, s) => `${n} ${s}${n > 1 ? "s" : ""}`;
+    $("#resultat-chiffres").innerHTML = `
+      <span class="chiffre ok"><b>${ajoutees.length}</b> ${ajoutees.length > 1 ? "mailles ajoutées" : "maille ajoutée"} en « Nouveau »</span>
+      <span class="chiffre"><b>${dejaPresentes}</b> déjà présente${dejaPresentes > 1 ? "s" : ""}, inchangée${dejaPresentes > 1 ? "s" : ""}</span>
+      <span class="chiffre ${rejets.length ? "ko" : ""}"><b>${rejets.length}</b> ligne${rejets.length > 1 ? "s" : ""} ignorée${rejets.length > 1 ? "s" : ""}</span>`;
+    $("#resultat-ajoutees").innerHTML = ajoutees.length
+      ? `<table><thead><tr><th>SIREN</th><th>Maille</th><th>Société</th></tr></thead><tbody>${ajoutees.map(m =>
+          `<tr><td class="siren">${esc(formatSiren(m.siren))}</td><td class="maille">${esc(m.maille)}</td><td>${m.societe ? esc(m.societe) : '<span class="inconnue">Non renseignée</span>'}</td></tr>`).join("")}</tbody></table>`
+      : "";
+    $("#resultat-rejets").innerHTML = rejets.length
+      ? `<p class="titre-rejets">Lignes ignorées</p><ul>${rejets.map(r => `<li>Ligne ${r.numero} : ${esc(r.raison)}</li>`).join("")}</ul>`
+      : "";
+    $("#resultat-import").hidden = false;
+    toast(`Import terminé : ${pl(ajoutees.length, "maille")} ajoutée${ajoutees.length > 1 ? "s" : ""}`);
+  }
+
   // --- Démarrage -------------------------------------------------------------
   async function charger() {
     try {
@@ -199,8 +373,10 @@
       $("#lignes").innerHTML = `<tr><td colspan="4" class="vide">${esc(err.message)}. Vérifiez que le site IIS est démarré puis rechargez la page.</td></tr>`;
       return;
     }
-    etat.mailles.sort((a, b) => a.societe.localeCompare(b.societe, "fr") || a.maille.localeCompare(b.maille, "fr"));
+    etat.mailles.sort(tri);
     rendre();
+    rendreExport();
   }
+  afficherOnglet(location.hash === "#import" ? "import" : "mailles");
   charger();
 })();

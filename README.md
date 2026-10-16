@@ -7,6 +7,14 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
 - Bandeau au-dessus de la liste : nombre et part de mailles par statut. Il suit les filtres Société / SIREN / Maille ;
   un clic sur un compteur filtre la liste sur ce statut.
 - Le statut se change directement dans la liste et est enregistré immédiatement.
+- Onglet **Import / export** :
+  - **Exporter siren.csv** : les SIREN distincts, un par ligne, sans en-tête.
+  - **Importer** `adresses_de_facturation.csv` : colonnes `SIREN, (non utilisée), (non utilisée), Adresse de facturation, (non utilisée)`.
+    La 4ᵉ colonne est la maille. Chaque couple (SIREN, maille) absent de la liste est ajouté au statut « Nouveau » ;
+    ceux déjà présents ne sont pas modifiés. Un compte rendu liste les mailles ajoutées et les lignes ignorées
+    (SIREN qui n'a pas 9 chiffres, maille vide). Séparateur `,` ou `;`, fichier UTF-8 ou Windows (Excel) ;
+    un SIREN dont Excel a supprimé les zéros en tête est complété à 9 chiffres. La société n'étant pas dans le fichier,
+    elle est reprise d'une maille existante du même SIREN, sinon laissée « Non renseignée ».
 
 ## Architecture
 
@@ -21,6 +29,8 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 |---|---|
 | `GET  api/mailles` | Liste des mailles |
 | `PUT  api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
+| `GET  api/siren.csv` | Export des SIREN distincts |
+| `POST api/mailles/import` — corps `{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"}]}` | Ajoute les mailles absentes (le CSV est lu dans le navigateur, le serveur revalide chaque ligne) |
 
 Les données sont gardées en mémoire et le fichier JSON est réécrit à chaque modification
 (écriture dans un `.tmp` puis remplacement, pour ne jamais laisser un fichier tronqué).

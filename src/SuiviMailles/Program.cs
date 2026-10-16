@@ -24,4 +24,23 @@ api.MapPut("/{id}/statut", async (string id, ChangementStatut corps, MailleStore
     return maille is null ? Results.NotFound() : Results.Ok(maille);
 });
 
+// Un SIREN par ligne, sans en-tête.
+app.MapGet("/api/siren.csv", async (MailleStore store) =>
+{
+    var sirens = await store.SirensAsync();
+    var contenu = string.Concat(sirens.Select(s => s + "\r\n"));
+    return Results.File(System.Text.Encoding.UTF8.GetBytes(contenu), "text/csv; charset=utf-8", "siren.csv");
+});
+
+// Le fichier adresses_de_facturation.csv est lu dans le navigateur ; le serveur reçoit les couples (SIREN, maille)
+// et revalide chaque ligne.
+api.MapPost("/import", async (DemandeImport demande, MailleStore store, HttpContext http) =>
+{
+    if (demande.Lignes is null || demande.Lignes.Count == 0)
+        return Results.BadRequest(new { erreur = "Aucune ligne à importer." });
+
+    var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+    return Results.Ok(await store.ImporterAsync(demande.Lignes, utilisateur));
+});
+
 app.Run();
