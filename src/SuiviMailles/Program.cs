@@ -24,6 +24,12 @@ api.MapPut("/{id}/statut", async (string id, ChangementStatut corps, MailleStore
     return maille is null ? Results.NotFound() : Results.Ok(maille);
 });
 
+api.MapDelete("/{id}", async (string id, MailleStore store, HttpContext http) =>
+{
+    var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+    return await store.SupprimerAsync(id, utilisateur) is null ? Results.NotFound() : Results.NoContent();
+});
+
 // Un SIREN par ligne, sans en-tête.
 app.MapGet("/api/siren.csv", async (MailleStore store) =>
 {

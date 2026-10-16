@@ -27,6 +27,11 @@
       if (!r.ok) throw new Error(`Enregistrement refusé par le serveur (HTTP ${r.status})`);
       return r.json();
     },
+    async supprimer(id) {
+      const r = await fetch(`api/mailles/${encodeURIComponent(id)}`, { method: "DELETE" });
+      // 404 : déjà supprimée par quelqu'un d'autre, le résultat attendu est atteint.
+      if (!r.ok && r.status !== 404) throw new Error(`Suppression refusée par le serveur (HTTP ${r.status})`);
+    },
     async importer(lignes) {
       const r = await fetch("api/mailles/import", {
         method: "POST",
@@ -39,7 +44,7 @@
   };
 
   // En démonstration (artefact de test) : données embarquées, modifications gardées dans ce navigateur.
-  const CLE = "suivimailles-demo-v2";
+  const CLE = "suivimailles-demo-v3";
   const demoStore = {
     demo: true,
     _donnees: [],
@@ -57,6 +62,10 @@
       Object.assign(m, { statut, modifieLe: new Date().toISOString() });
       this._sauver();
       return structuredClone(m);
+    },
+    async supprimer(id) {
+      this._donnees = this._donnees.filter(m => m.id !== id);
+      this._sauver();
     },
     // Même règles que MailleStore.ImporterAsync côté serveur.
     async importer(lignes) {
@@ -147,7 +156,7 @@
 
     const tbody = $("#lignes");
     if (!visibles.length) {
-      tbody.innerHTML = `<tr><td colspan="4" class="vide">${etat.mailles.length ? "Aucune maille ne correspond aux filtres." : "Aucune maille à afficher."}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="vide">${etat.mailles.length ? "Aucune maille ne correspond aux filtres." : "Aucune maille à afficher."}</td></tr>`;
       return;
     }
     tbody.innerHTML = visibles.map(m => `
@@ -159,6 +168,11 @@
           <select class="statut ${esc(m.statut)}" aria-label="Statut de ${esc(m.maille)} – ${esc(m.societe)}">
             ${STATUTS.map(s => `<option value="${s.code}"${s.code === m.statut ? " selected" : ""}>${s.libelle}</option>`).join("")}
           </select>
+        </td>
+        <td class="col-actions">
+          <button type="button" class="supprimer" title="Supprimer cette maille" aria-label="Supprimer ${esc(m.maille)}">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 1.5h4a.5.5 0 0 1 .5.5v1H14v1.5h-1l-.7 9.1a1.5 1.5 0 0 1-1.5 1.4H5.2a1.5 1.5 0 0 1-1.5-1.4L3 4.5H2V3h3.5V2a.5.5 0 0 1 .5-.5Zm-1.5 3 .7 9h5.6l.7-9h-7Zm2 1.5h1v6h-1v-6Zm2 0h1v6h-1v-6Z"/></svg>
+          </button>
         </td>
       </tr>`).join("");
   }
@@ -207,12 +221,68 @@
     try {
       const maj = await store.changerStatut(id, nouveau);
       Object.assign(maille, maj);
-      toast(`${maille.maille} (${maille.societe}) : ${libelleStatut[nouveau]}`);
+      toast(`${maille.maille}${maille.societe ? ` (${maille.societe})` : ""} : ${libelleStatut[nouveau]}`);
     } catch (err) {
       maille.statut = ancien;
       toast(`${err.message}. Le statut reste « ${libelleStatut[ancien]} ».`);
     }
     rendre();
+  });
+
+  // --- Suppression avec confirmation ---------------------------------------------
+  let aSupprimer = null, focusAvant = null;
+
+  function ouvrirConfirmation(maille) {
+    aSupprimer = maille;
+    focusAvant = document.activeElement;
+    $("#conf-detail").innerHTML = `
+      <dt>Maille</dt><dd class="maille">${esc(maille.maille)}</dd>
+      <dt>SIREN</dt><dd class="siren">${esc(formatSiren(maille.siren))}</dd>
+      <dt>Société</dt><dd>${maille.societe ? esc(maille.societe) : '<span class="inconnue">Non renseignée</span>'}</dd>
+      <dt>Statut</dt><dd><span class="pastille-statut ${esc(maille.statut)}">${libelleStatut[maille.statut]}</span></dd>`;
+    $("#confirmation").hidden = false;
+    $("#conf-annuler").focus();
+  }
+
+  function fermerConfirmation() {
+    $("#confirmation").hidden = true;
+    aSupprimer = null;
+    focusAvant?.focus?.();
+  }
+
+  $("#lignes").addEventListener("click", e => {
+    const btn = e.target.closest("button.supprimer");
+    if (!btn) return;
+    ouvrirConfirmation(etat.mailles.find(m => m.id === btn.closest("tr").dataset.id));
+  });
+  $("#conf-annuler").addEventListener("click", fermerConfirmation);
+  $("#confirmation").addEventListener("click", e => { if (e.target.id === "confirmation") fermerConfirmation(); });
+  document.addEventListener("keydown", e => {
+    if ($("#confirmation").hidden) return;
+    if (e.key === "Escape") fermerConfirmation();
+    if (e.key === "Tab") {
+      // Garde le focus dans la fenêtre de confirmation.
+      e.preventDefault();
+      (document.activeElement === $("#conf-annuler") ? $("#conf-supprimer") : $("#conf-annuler")).focus();
+    }
+  });
+  $("#conf-supprimer").addEventListener("click", async () => {
+    const maille = aSupprimer;
+    if (!maille) return;
+    const btn = $("#conf-supprimer");
+    btn.disabled = true;
+    try {
+      await store.supprimer(maille.id);
+      etat.mailles = etat.mailles.filter(m => m.id !== maille.id);
+      fermerConfirmation();
+      rendre();
+      rendreExport();
+      toast(`Maille ${maille.maille} supprimée`);
+    } catch (err) {
+      toast(`${err.message}. La maille n'a pas été supprimée.`);
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   if (store.demo) {
@@ -370,7 +440,7 @@
     try {
       etat.mailles = await store.lister();
     } catch (err) {
-      $("#lignes").innerHTML = `<tr><td colspan="4" class="vide">${esc(err.message)}. Vérifiez que le site IIS est démarré puis rechargez la page.</td></tr>`;
+      $("#lignes").innerHTML = `<tr><td colspan="5" class="vide">${esc(err.message)}. Vérifiez que le site IIS est démarré puis rechargez la page.</td></tr>`;
       return;
     }
     etat.mailles.sort(tri);

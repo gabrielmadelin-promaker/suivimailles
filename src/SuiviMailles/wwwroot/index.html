@@ -56,7 +56,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th scope="col">Société</th><th scope="col">SIREN</th><th scope="col">Maille</th><th scope="col" class="col-statut">Statut</th></tr>
+          <tr><th scope="col">Société</th><th scope="col">SIREN</th><th scope="col">Maille</th><th scope="col" class="col-statut">Statut</th><th scope="col" class="col-actions"><span class="visuellement-cache">Actions</span></th></tr>
           <tr class="filtres">
             <th><input id="f-societe" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
             <th><input id="f-siren" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par SIREN" inputmode="numeric" autocomplete="off"></th>
@@ -69,6 +69,7 @@
                 <option value="non_legitime">Non légitime</option>
               </select>
             </th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="lignes"></tbody>
@@ -112,6 +113,18 @@
         <div id="resultat-rejets"></div>
       </div>
     </section>
+  </div>
+</div>
+<div id="confirmation" class="voile" hidden>
+  <div class="fenetre" role="alertdialog" aria-modal="true" aria-labelledby="conf-titre" aria-describedby="conf-avert">
+    <h2 id="conf-titre">Supprimer cette maille ?</h2>
+    <dl id="conf-detail" class="conf-detail"></dl>
+    <p id="conf-avert" class="avertissement">La suppression est définitive : la maille et son statut seront effacés.
+      Si elle figure encore dans adresses_de_facturation.csv, le prochain import la recréera au statut « Nouveau ».</p>
+    <div class="fenetre-actions">
+      <button id="conf-annuler" class="btn" type="button">Annuler</button>
+      <button id="conf-supprimer" class="btn danger" type="button">Supprimer définitivement</button>
+    </div>
   </div>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>

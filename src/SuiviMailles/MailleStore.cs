@@ -59,6 +59,23 @@ public sealed class MailleStore
         finally { _verrou.Release(); }
     }
 
+    public async Task<LigneMaille?> SupprimerAsync(string id, string? utilisateur)
+    {
+        await _verrou.WaitAsync();
+        try
+        {
+            var maille = _mailles.FirstOrDefault(m => m.Id == id);
+            if (maille is null) return null;
+
+            _mailles.Remove(maille);
+            await EcrireAsync();
+            _logger.LogWarning("Maille supprimée : {Id} {Siren} {Maille} (statut {Statut}) par {Utilisateur}",
+                maille.Id, maille.Siren, maille.Maille, maille.Statut, utilisateur ?? "anonyme");
+            return maille;
+        }
+        finally { _verrou.Release(); }
+    }
+
     public async Task<IReadOnlyList<string>> SirensAsync()
     {
         await _verrou.WaitAsync();

@@ -1,226 +1,51 @@
 [
   {
     "id": "0001",
-    "societe": "Atlantique Logistique",
-    "siren": "357231950",
-    "maille": "NOR-LEHAVRE",
-    "statut": "non_legitime"
+    "societe": "",
+    "siren": "055804124",
+    "maille": "055804124_arval_energie_telepeage",
+    "statut": "nouveau"
   },
   {
     "id": "0002",
-    "societe": "Atlantique Logistique",
-    "siren": "357231950",
-    "maille": "IDF-SUD",
+    "societe": "",
+    "siren": "055804124",
+    "maille": "055804124_FILM",
     "statut": "nouveau"
   },
   {
     "id": "0003",
-    "societe": "Atlantique Logistique",
-    "siren": "357231950",
-    "maille": "ARA-LYON",
+    "societe": "",
+    "siren": "055804124",
+    "maille": "055804124_HOLD",
     "statut": "nouveau"
   },
   {
     "id": "0004",
-    "societe": "Transports Kerlan",
-    "siren": "213185879",
-    "maille": "NAQ-BORDEAUX",
-    "statut": "non_legitime"
+    "societe": "",
+    "siren": "055804124",
+    "maille": "055804124_NDFHOLD",
+    "statut": "nouveau"
   },
   {
     "id": "0005",
-    "societe": "Transports Kerlan",
-    "siren": "213185879",
-    "maille": "IDF-SUD",
+    "societe": "",
+    "siren": "414704163",
+    "maille": "414704163",
     "statut": "nouveau"
   },
   {
     "id": "0006",
-    "societe": "Rhône Fret Services",
-    "siren": "442009973",
-    "maille": "ARA-LYON",
+    "societe": "",
+    "siren": "414704163",
+    "maille": "414704163_arval_energie_telepeage",
     "statut": "nouveau"
   },
   {
     "id": "0007",
-    "societe": "Rhône Fret Services",
-    "siren": "442009973",
-    "maille": "OCC-SETE",
+    "societe": "",
+    "siren": "414704163",
+    "maille": "414704163_NDF",
     "statut": "nouveau"
-  },
-  {
-    "id": "0008",
-    "societe": "Rhône Fret Services",
-    "siren": "442009973",
-    "maille": "BRE-RENNES",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0009",
-    "societe": "Docks de Gennevilliers",
-    "siren": "630514313",
-    "maille": "BFC-DIJON",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0010",
-    "societe": "Docks de Gennevilliers",
-    "siren": "630514313",
-    "maille": "NAQ-BORDEAUX",
-    "statut": "non_legitime"
-  },
-  {
-    "id": "0011",
-    "societe": "Normandie Transit",
-    "siren": "471591636",
-    "maille": "PACA-FOS",
-    "statut": "legitime"
-  },
-  {
-    "id": "0012",
-    "societe": "Normandie Transit",
-    "siren": "471591636",
-    "maille": "HDF-LILLE",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0013",
-    "societe": "Normandie Transit",
-    "siren": "471591636",
-    "maille": "ARA-LYON",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0014",
-    "societe": "Agence Maritime Sud",
-    "siren": "163255193",
-    "maille": "ARA-LYON",
-    "statut": "non_legitime"
-  },
-  {
-    "id": "0015",
-    "societe": "Agence Maritime Sud",
-    "siren": "163255193",
-    "maille": "NOR-LEHAVRE",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0016",
-    "societe": "Agence Maritime Sud",
-    "siren": "163255193",
-    "maille": "OCC-SETE",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0017",
-    "societe": "Fret Rail Lorraine",
-    "siren": "949378756",
-    "maille": "NAQ-BORDEAUX",
-    "statut": "legitime"
-  },
-  {
-    "id": "0018",
-    "societe": "Fret Rail Lorraine",
-    "siren": "949378756",
-    "maille": "NOR-LEHAVRE",
-    "statut": "legitime"
-  },
-  {
-    "id": "0019",
-    "societe": "Fret Rail Lorraine",
-    "siren": "949378756",
-    "maille": "BRE-RENNES",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0020",
-    "societe": "Fret Rail Lorraine",
-    "siren": "949378756",
-    "maille": "PDL-NANTES",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0021",
-    "societe": "Entrepôts du Val d'Oise",
-    "siren": "407349141",
-    "maille": "BRE-RENNES",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0022",
-    "societe": "Entrepôts du Val d'Oise",
-    "siren": "407349141",
-    "maille": "HDF-LILLE",
-    "statut": "legitime"
-  },
-  {
-    "id": "0023",
-    "societe": "Comptoir Portuaire de Sète",
-    "siren": "904851417",
-    "maille": "BRE-RENNES",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0024",
-    "societe": "Comptoir Portuaire de Sète",
-    "siren": "904851417",
-    "maille": "IDF-NORD",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0025",
-    "societe": "Comptoir Portuaire de Sète",
-    "siren": "904851417",
-    "maille": "OCC-SETE",
-    "statut": "legitime"
-  },
-  {
-    "id": "0026",
-    "societe": "Comptoir Portuaire de Sète",
-    "siren": "904851417",
-    "maille": "NOR-LEHAVRE",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0027",
-    "societe": "Alpes Messagerie",
-    "siren": "291657138",
-    "maille": "NOR-LEHAVRE",
-    "statut": "non_legitime"
-  },
-  {
-    "id": "0028",
-    "societe": "Alpes Messagerie",
-    "siren": "291657138",
-    "maille": "HDF-LILLE",
-    "statut": "legitime"
-  },
-  {
-    "id": "0029",
-    "societe": "Garonne Distribution",
-    "siren": "554323444",
-    "maille": "BRE-RENNES",
-    "statut": "legitime"
-  },
-  {
-    "id": "0030",
-    "societe": "Garonne Distribution",
-    "siren": "554323444",
-    "maille": "IDF-SUD",
-    "statut": "nouveau"
-  },
-  {
-    "id": "0031",
-    "societe": "Ouest Conteneurs",
-    "siren": "335189973",
-    "maille": "NAQ-BORDEAUX",
-    "statut": "non_legitime"
-  },
-  {
-    "id": "0032",
-    "societe": "Ouest Conteneurs",
-    "siren": "335189973",
-    "maille": "HDF-LILLE",
-    "statut": "legitime"
   }
 ]

@@ -7,6 +7,9 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
 - Bandeau au-dessus de la liste : nombre et part de mailles par statut. Il suit les filtres Société / SIREN / Maille ;
   un clic sur un compteur filtre la liste sur ce statut.
 - Le statut se change directement dans la liste et est enregistré immédiatement.
+- Bouton corbeille sur chaque ligne : supprime la maille après confirmation (avertissement : suppression définitive,
+  la maille sera recréée en « Nouveau » si elle figure encore dans un prochain import). Chaque suppression est tracée
+  dans le journal de l'application.
 - Onglet **Import / export** :
   - **Exporter siren.csv** : les SIREN distincts, un par ligne, sans en-tête.
   - **Importer** `adresses_de_facturation.csv` : colonnes `SIREN, (non utilisée), (non utilisée), Adresse de facturation, (non utilisée)`.
@@ -29,6 +32,7 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 |---|---|
 | `GET  api/mailles` | Liste des mailles |
 | `PUT  api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
+| `DELETE api/mailles/{id}` | Supprime une maille |
 | `GET  api/siren.csv` | Export des SIREN distincts |
 | `POST api/mailles/import` — corps `{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"}]}` | Ajoute les mailles absentes (le CSV est lu dans le navigateur, le serveur revalide chaque ligne) |
 
@@ -37,6 +41,8 @@ Les données sont gardées en mémoire et le fichier JSON est réécrit à chaqu
 Si l'authentification Windows est activée sur le site, le compte qui modifie est enregistré dans `modifiePar`.
 
 Au premier démarrage, si le fichier de données n'existe pas, il est créé à partir de `Data/mailles.seed.json`.
+Ce fichier est construit depuis un export `adresses_de_facturation.csv` :
+`node tools/seed-depuis-csv.mjs <adresses_de_facturation.csv> src/SuiviMailles/Data/mailles.seed.json`.
 Le fichier de données n'est jamais publié : un redéploiement n'écrase pas les statuts saisis.
 
 ## Déploiement sur IIS
@@ -54,16 +60,15 @@ Pour garder les données hors du dossier du site, définir le chemin dans `appse
 "Stockage": { "Fichier": "D:\\Data\\SuiviMailles\\mailles.json" }
 ```
 
-Remplacer `Data/mailles.seed.json` par la vraie liste avant le premier démarrage, ou déposer directement
-le fichier de données au même format.
+Pour démarrer avec une autre liste, régénérer `Data/mailles.seed.json` avant le premier démarrage,
+ou importer le fichier depuis l'onglet Import / export.
 
 ## Artefact de test
 
-`artefact/suivi-mailles.html` est une page autonome (interface + données fictives) qui tourne sans serveur ;
+`artefact/suivi-mailles.html` est une page autonome (interface + données de `mailles.seed.json`) qui tourne sans serveur ;
 les changements de statut y sont gardés dans le navigateur. Elle se régénère depuis les sources :
 
 ```
-node tools/generer-seed.mjs src/SuiviMailles/Data/mailles.seed.json   # données fictives
 node tools/construire-artefact.mjs artefact/suivi-mailles.html
 ```
 
