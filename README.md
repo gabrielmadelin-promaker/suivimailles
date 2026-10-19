@@ -7,6 +7,9 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
 - Bandeau au-dessus de la liste : nombre et part de mailles par statut. Il suit les filtres Société / SIREN / Maille ;
   un clic sur un compteur filtre la liste sur ce statut.
 - Le statut se change directement dans la liste et est enregistré immédiatement.
+- **Exporter vers Excel** : fichier `mailles-AAAA-MM-JJ.xlsx` des lignes affichées (filtres appliqués) avec société, SIREN
+  (en texte, zéros conservés), maille, statut en couleur, date et auteur de la dernière modification. Le fichier est
+  produit dans le navigateur, sans accès internet.
 - Bouton corbeille sur chaque ligne : supprime la maille après confirmation (avertissement : suppression définitive,
   la maille sera recréée en « Nouveau » si elle figure encore dans un prochain import). Chaque suppression est tracée
   dans le journal de l'application.
@@ -18,8 +21,9 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
   - **Exporter siren.csv** : les SIREN distincts, un par ligne, sans en-tête.
   - **Ouvrir l'annuaire** : lien vers l'annuaire de la facturation électronique (https://facturation.chorus-pro.gouv.fr/annuaire), dans un nouvel onglet.
   - **Importer** `adresses_de_facturation.csv` : colonnes `SIREN, (non utilisée), (non utilisée), Adresse de facturation, (non utilisée)`.
-    La 4ᵉ colonne est la maille. Chaque couple (SIREN, maille) absent de la liste est ajouté au statut « Nouveau » ;
-    ceux déjà présents ne sont pas modifiés. Un compte rendu liste les mailles ajoutées et les lignes ignorées
+    La 4ᵉ colonne est la maille. Seules les mailles absentes de la liste sont ajoutées, au statut « Nouveau » :
+    une maille déjà présente (même code, sans tenir compte des majuscules ni des espaces) n'est pas importée et garde
+    son statut ; le compte rendu liste ces mailles non importées. Un compte rendu liste les mailles ajoutées et les lignes ignorées
     (SIREN qui n'a pas 9 chiffres, maille vide). Séparateur `,` ou `;`, fichier UTF-8 ou Windows (Excel) ;
     un SIREN dont Excel a supprimé les zéros en tête est complété à 9 chiffres. La société n'étant pas dans le fichier,
     elle est reprise d'une maille existante du même SIREN, sinon laissée « Non renseignée ».

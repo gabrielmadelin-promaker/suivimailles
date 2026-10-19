@@ -52,7 +52,10 @@
   <section class="liste" aria-label="Liste des mailles">
     <div class="liste-tete">
       <span id="affiches" class="affiches">Chargement…</span>
-      <button id="effacer" class="btn" type="button" disabled>Effacer les filtres</button>
+      <div class="actions">
+        <button id="effacer" class="btn" type="button" disabled>Effacer les filtres</button>
+        <button id="exporter-excel" class="btn principal" type="button">Exporter vers Excel</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table>
@@ -157,7 +160,7 @@
     <section class="carte">
       <div class="carte-tete">
         <h2>Importer les adresses de facturation</h2>
-        <p class="sub">Fichier <code>adresses_de_facturation.csv</code>. Les mailles absentes de la liste sont ajoutées au statut « Nouveau » ; celles déjà présentes gardent leur statut.</p>
+        <p class="sub">Fichier <code>adresses_de_facturation.csv</code>. Seules les mailles absentes de la liste sont ajoutées, au statut « Nouveau ». Une maille déjà présente n'est pas importée et garde son statut.</p>
       </div>
       <div class="modele" aria-label="Colonnes attendues">
         <span class="col utile">SIREN</span><span class="col">non utilisée</span><span class="col">non utilisée</span><span class="col utile">Maille</span><span class="col">non utilisée</span>

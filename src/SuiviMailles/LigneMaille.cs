@@ -30,7 +30,9 @@ public sealed record DemandeImport(IReadOnlyList<LigneImport> Lignes);
 
 public sealed record Rejet(int Numero, string Raison);
 
-public sealed record ResultatImport(IReadOnlyList<LigneMaille> Ajoutees, int DejaPresentes, IReadOnlyList<Rejet> Rejets);
+public sealed record MailleExistante(int Numero, string Maille);
+
+public sealed record ResultatImport(IReadOnlyList<LigneMaille> Ajoutees, int DejaPresentes, IReadOnlyList<MailleExistante> NonImportees, IReadOnlyList<Rejet> Rejets);
 
 /// <summary>Référentiel des sociétés : un nom par SIREN.</summary>
 public sealed record Societe(string Siren, string Nom);

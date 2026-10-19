@@ -220,3 +220,8 @@ button.lien-mailles {
 button.lien-mailles:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .actions:has(#fichier-soc:focus-visible) label.btn { outline: 2px solid var(--focus); outline-offset: 1px; }
 @media (max-width: 560px) { .ajout-societe { grid-template-columns: 1fr; } }
+
+details.deja { color: var(--muted); }
+details.deja summary { cursor: pointer; font-weight: 600; color: var(--fg); }
+details.deja ul { margin-top: 6px; }
+details.deja .maille { font-family: var(--font-data); font-size: 12.5px; }

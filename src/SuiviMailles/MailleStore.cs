@@ -102,19 +102,20 @@ public sealed class MailleStore
     }
 
     /// <summary>
-    /// Ajoute les couples (SIREN, maille) absents, au statut Nouveau. Une maille déjà connue pour ce SIREN
-    /// (y compris en double dans le même fichier) n'est jamais modifiée, son statut est conservé.
+    /// Ajoute les mailles absentes, au statut Nouveau. Une maille déjà présente (même code, sans tenir compte
+    /// des majuscules ni des espaces autour, quel que soit le SIREN) ou en double dans le fichier n'est pas importée :
+    /// la maille existante et son statut restent inchangés.
     /// </summary>
     public async Task<ResultatImport> ImporterAsync(IEnumerable<LigneImport> lignes, string? utilisateur)
     {
         await _verrou.WaitAsync();
         try
         {
-            var connues = new HashSet<string>(_mailles.Select(m => Cle(m.Siren, m.Maille)), StringComparer.OrdinalIgnoreCase);
+            var connues = new HashSet<string>(_mailles.Select(m => m.Maille.Trim()), StringComparer.OrdinalIgnoreCase);
             var prochainId = _mailles.Select(m => int.TryParse(m.Id, out var n) ? n : 0).DefaultIfEmpty(0).Max() + 1;
             var ajoutees = new List<LigneMaille>();
             var rejets = new List<Rejet>();
-            var dejaPresentes = 0;
+            var nonImportees = new List<MailleExistante>();
 
             foreach (var ligne in lignes)
             {
@@ -122,7 +123,7 @@ public sealed class MailleStore
                 var maille = (ligne.Maille ?? "").Trim();
                 if (!Regex.IsMatch(siren, @"^[0-9]{9}$")) { rejets.Add(new(ligne.Numero, siren.Length == 0 ? "SIREN manquant" : $"SIREN invalide « {ligne.Siren} »")); continue; }
                 if (maille.Length == 0) { rejets.Add(new(ligne.Numero, "Maille vide")); continue; }
-                if (!connues.Add(Cle(siren, maille))) { dejaPresentes++; continue; }
+                if (!connues.Add(maille)) { nonImportees.Add(new(ligne.Numero, maille)); continue; }
 
                 var nouvelle = new LigneMaille
                 {
@@ -140,8 +141,8 @@ public sealed class MailleStore
             }
 
             if (ajoutees.Count > 0) await EcrireAsync();
-            _logger.LogInformation("Import : {Ajoutees} ajoutées, {Deja} déjà présentes, {Rejets} rejetées", ajoutees.Count, dejaPresentes, rejets.Count);
-            return new ResultatImport(ajoutees, dejaPresentes, rejets);
+            _logger.LogInformation("Import : {Ajoutees} ajoutées, {Deja} déjà présentes, {Rejets} rejetées", ajoutees.Count, nonImportees.Count, rejets.Count);
+            return new ResultatImport(ajoutees, nonImportees.Count, nonImportees, rejets);
         }
         finally { _verrou.Release(); }
     }
@@ -216,8 +217,6 @@ public sealed class MailleStore
         else _societes[siren] = nom;
         foreach (var m in _mailles.Where(m => m.Siren == siren)) m.Societe = nom;
     }
-
-    private static string Cle(string siren, string maille) => $"{siren}|{maille.Trim()}";
 
     private Task EcrireAsync() => EcrireAsync(_fichier, _mailles);
 
