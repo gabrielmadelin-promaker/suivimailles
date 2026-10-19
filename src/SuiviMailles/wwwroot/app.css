@@ -196,3 +196,7 @@ button.supprimer:focus-visible { outline: 2px solid var(--focus); outline-offset
 .fenetre-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .btn.danger { background: var(--nonleg); border-color: var(--nonleg); color: var(--surface); font-weight: 500; }
 .btn.danger:hover { background: color-mix(in srgb, var(--nonleg) 85%, var(--fg)); }
+
+.btn.lien-externe { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-weight: 500; }
+.btn.lien-externe:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.url { font-family: var(--font-data); font-size: 12px; overflow-wrap: anywhere; }
