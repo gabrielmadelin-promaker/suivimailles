@@ -20,7 +20,7 @@
     },
     async changerStatut(id, statut) {
       const r = await fetch(`api/mailles/${encodeURIComponent(id)}/statut`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ statut }),
       });
@@ -28,7 +28,7 @@
       return r.json();
     },
     async supprimer(id) {
-      const r = await fetch(`api/mailles/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const r = await fetch(`api/mailles/${encodeURIComponent(id)}/supprimer`, { method: "POST" });
       // 404 : déjà supprimée par quelqu'un d'autre, le résultat attendu est atteint.
       if (!r.ok && r.status !== 404) throw new Error(`Suppression refusée par le serveur (HTTP ${r.status})`);
     },

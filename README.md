@@ -32,8 +32,8 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 | Appel | Rôle |
 |---|---|
 | `GET  api/mailles` | Liste des mailles |
-| `PUT  api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
-| `DELETE api/mailles/{id}` | Supprime une maille |
+| `POST api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
+| `POST api/mailles/{id}/supprimer` | Supprime une maille |
 | `GET  api/siren.csv` | Export des SIREN distincts |
 | `POST api/mailles/import` — corps `{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"}]}` | Ajoute les mailles absentes (le CSV est lu dans le navigateur, le serveur revalide chaque ligne) |
 

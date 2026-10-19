@@ -12,7 +12,8 @@ var api = app.MapGroup("/api/mailles");
 
 api.MapGet("/", async (MailleStore store) => Results.Ok(await store.ListerAsync()));
 
-api.MapPut("/{id}/statut", async (string id, ChangementStatut corps, MailleStore store, HttpContext http) =>
+// POST plutôt que PUT/DELETE : WebDAV, souvent installé sur les serveurs IIS, intercepte PUT et DELETE.
+api.MapPost("/{id}/statut", async (string id, ChangementStatut corps, MailleStore store, HttpContext http) =>
 {
     if (!Statuts.Tous.Contains(corps.Statut))
         return Results.BadRequest(new { erreur = $"Statut inconnu : {corps.Statut}" });
@@ -24,7 +25,7 @@ api.MapPut("/{id}/statut", async (string id, ChangementStatut corps, MailleStore
     return maille is null ? Results.NotFound() : Results.Ok(maille);
 });
 
-api.MapDelete("/{id}", async (string id, MailleStore store, HttpContext http) =>
+api.MapPost("/{id}/supprimer", async (string id, MailleStore store, HttpContext http) =>
 {
     var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
     return await store.SupprimerAsync(id, utilisateur) is null ? Results.NotFound() : Results.NoContent();

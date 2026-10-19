@@ -36,13 +36,13 @@ jobs:
           set -x
           curl -sf http://127.0.0.1:5080/ | grep -q "Suivi des mailles"
           test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
-          curl -sf -X PUT -H "Content-Type: application/json" -d '{"statut":"legitime"}' http://127.0.0.1:5080/api/mailles/0001/statut | jq -e '.statut == "legitime"'
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"statut":"autre"}' http://127.0.0.1:5080/api/mailles/0001/statut)" = 400
+          curl -sf -X POST -H "Content-Type: application/json" -d '{"statut":"legitime"}' http://127.0.0.1:5080/api/mailles/0001/statut | jq -e '.statut == "legitime"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"statut":"autre"}' http://127.0.0.1:5080/api/mailles/0001/statut)" = 400
           curl -sf -X POST -H "Content-Type: application/json" \
             -d '{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"},{"numero":3,"siren":"123456789","maille":"123456789_TEST"},{"numero":4,"siren":"12","maille":""}]}' \
             http://127.0.0.1:5080/api/mailles/import | jq -e '(.ajoutees | length) == 1 and .dejaPresentes == 1 and (.rejets | length) == 1'
           test "$(curl -sf http://127.0.0.1:5080/api/siren.csv | wc -l)" = 3
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE http://127.0.0.1:5080/api/mailles/0008)" = 204
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:5080/api/mailles/0008/supprimer)" = 204
           test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
           jq -e '.[0].statut == "legitime"' App_Data/mailles.json
           kill $PID
