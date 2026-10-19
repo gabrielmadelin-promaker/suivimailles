@@ -58,6 +58,7 @@ jobs:
           test "$(curl -sf http://127.0.0.1:5080/api/societes | jq length)" = 3
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"12","nom":"x"}' http://127.0.0.1:5080/api/societes)" = 400
           jq -e 'length == 2' App_Data/societes.json
+          curl -sf http://127.0.0.1:5080/api/siren.csv | grep -q 987654321
           kill $PID
           # Le zip ne doit contenir aucune donnée de test.
           rm -rf App_Data logs

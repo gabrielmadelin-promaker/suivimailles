@@ -18,7 +18,7 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
   le reprennent aussi. Ajout manuel, filtres, lien vers les mailles du SIREN, et import d'un CSV `SOCIETE;SIREN`
   (colonnes repérées par l'en-tête) : SIREN inconnus ajoutés, noms des SIREN connus mis à jour.
 - Onglet **Import / export** :
-  - **Exporter siren.csv** : les SIREN distincts, un par ligne, sans en-tête.
+  - **Exporter siren.csv** : les SIREN distincts (mailles et sociétés du référentiel), un par ligne, sans en-tête.
   - **Ouvrir l'annuaire** : lien vers l'annuaire de la facturation électronique (https://facturation.chorus-pro.gouv.fr/annuaire), dans un nouvel onglet.
   - **Importer** `adresses_de_facturation.csv` : colonnes `SIREN, (non utilisée), (non utilisée), Adresse de facturation, (non utilisée)`.
     La 4ᵉ colonne est la maille. Seules les mailles absentes de la liste sont ajoutées, au statut « Nouveau » :

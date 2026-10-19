@@ -383,7 +383,8 @@
   });
 
   // --- Export des SIREN ----------------------------------------------------------
-  const sirensDistincts = () => [...new Set(etat.mailles.map(m => m.siren))].sort();
+  // SIREN des mailles et des sociétés (une société ajoutée sans maille doit aussi être recherchée dans l'annuaire).
+  const sirensDistincts = () => [...new Set([...etat.mailles.map(m => m.siren), ...etat.societes.map(s => s.siren)])].sort();
 
   function rendreExport() {
     const n = sirensDistincts().length;
@@ -670,6 +671,7 @@
       return;
     }
     rendreSocietes();
+    rendreExport();
   }
 
   function compterSocietes(nbVisibles = etat.societes.length) {
@@ -708,6 +710,7 @@
     const vue = await store.definirSociete(siren, nom);
     reporterNom(vue.siren, vue.nom);
     if (!etat.societes.some(x => x.siren === vue.siren)) etat.societes.push(vue);
+    rendreExport();
     return vue;
   }
 

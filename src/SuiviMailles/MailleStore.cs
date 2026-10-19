@@ -97,7 +97,8 @@ public sealed class MailleStore
     public async Task<IReadOnlyList<string>> SirensAsync()
     {
         await _verrou.WaitAsync();
-        try { return _mailles.Select(m => m.Siren).Distinct().Order(StringComparer.Ordinal).ToList(); }
+        // SIREN des mailles et des sociétés du référentiel : une société ajoutée sans maille doit aussi être recherchée dans l'annuaire.
+        try { return _mailles.Select(m => m.Siren).Union(_societes.Keys).Distinct().Order(StringComparer.Ordinal).ToList(); }
         finally { _verrou.Release(); }
     }
 
