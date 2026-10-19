@@ -225,3 +225,5 @@ details.deja { color: var(--muted); }
 details.deja summary { cursor: pointer; font-weight: 600; color: var(--fg); }
 details.deja ul { margin-top: 6px; }
 details.deja .maille { font-family: var(--font-data); font-size: 12.5px; }
+
+.version { text-align: center; color: var(--muted); font-size: 12px; margin: 0 0 24px; font-variant-numeric: tabular-nums; }

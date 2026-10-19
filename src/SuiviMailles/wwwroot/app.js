@@ -862,6 +862,11 @@
     rendreExport();
     await rafraichirSocietes();
   }
+  if (!store.demo) {
+    fetch("api/version").then(r => r.ok ? r.json() : null).then(v => {
+      if (v?.version) { $("#version").textContent = `Version ${v.version}`; $("#version").hidden = false; }
+    }).catch(() => { /* sans importance */ });
+  }
   afficherOnglet(["#societes", "#import"].includes(location.hash) ? location.hash.slice(1) : "mailles");
   charger();
 })();

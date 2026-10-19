@@ -29,7 +29,8 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Publication
-        run: dotnet publish src/SuiviMailles -c Release -o paquet
+        # Version affichée dans l'application : date de construction et commit.
+        run: dotnet publish src/SuiviMailles -c Release -o paquet -p:InformationalVersion="$(date -u +%Y-%m-%d) ${GITHUB_SHA::7}" -p:IncludeSourceRevisionInInformationalVersion=false
 
       - name: Vérification de l'API
         run: |
@@ -59,6 +60,10 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"12","nom":"x"}' http://127.0.0.1:5080/api/societes)" = 400
           jq -e 'length == 2' App_Data/societes.json
           curl -sf http://127.0.0.1:5080/api/siren.csv | grep -q 987654321
+          curl -sf -X POST -H "Content-Type: application/json" -d '{"siren":"111222333","nom":"Sans maille"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 0'
+          curl -sf http://127.0.0.1:5080/api/siren.csv | grep -q 111222333
+          curl -sI http://127.0.0.1:5080/api/siren.csv | grep -qi "cache-control: no-store"
+          curl -sf http://127.0.0.1:5080/api/version | jq -e '.version | test("^[0-9]{4}-")'
           kill $PID
           # Le zip ne doit contenir aucune donnée de test.
           rm -rf App_Data logs

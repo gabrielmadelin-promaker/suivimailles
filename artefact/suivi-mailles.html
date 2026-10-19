@@ -230,6 +230,8 @@ details.deja summary { cursor: pointer; font-weight: 600; color: var(--fg); }
 details.deja ul { margin-top: 6px; }
 details.deja .maille { font-family: var(--font-data); font-size: 12.5px; }
 
+.version { text-align: center; color: var(--muted); font-size: 12px; margin: 0 0 24px; font-variant-numeric: tabular-nums; }
+
 </style>
 <div class="page">
   <header class="top">
@@ -412,6 +414,7 @@ details.deja .maille { font-family: var(--font-data); font-size: 12.5px; }
     </div>
   </div>
 </div>
+<p id="version" class="version" hidden></p>
 <div id="toast" class="toast" role="status" hidden></div>
 <script>window.SUIVI_DEMO_DATA = [
   {
@@ -1328,6 +1331,11 @@ details.deja .maille { font-family: var(--font-data); font-size: 12.5px; }
     rendre();
     rendreExport();
     await rafraichirSocietes();
+  }
+  if (!store.demo) {
+    fetch("api/version").then(r => r.ok ? r.json() : null).then(v => {
+      if (v?.version) { $("#version").textContent = `Version ${v.version}`; $("#version").hidden = false; }
+    }).catch(() => { /* sans importance */ });
   }
   afficherOnglet(["#societes", "#import"].includes(location.hash) ? location.hash.slice(1) : "mailles");
   charger();

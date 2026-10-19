@@ -6,7 +6,23 @@ builder.Services.AddSingleton<MailleStore>();
 var app = builder.Build();
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+// Le navigateur revalide la page et les scripts à chaque chargement : après une mise à jour du serveur,
+// il ne peut pas continuer à utiliser l'ancienne version gardée en cache.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+});
+// Les réponses de l'API (dont siren.csv) ne sont jamais mises en cache.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.Headers.CacheControl = "no-store";
+    await next();
+});
+
+var version = typeof(Program).Assembly
+    .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+    .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "dev";
+app.MapGet("/api/version", () => Results.Ok(new { version }));
 
 var api = app.MapGroup("/api/mailles");
 
