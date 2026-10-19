@@ -1,0 +1,46 @@
+﻿SUIVI DES MAILLES - INSTALLATION SUR LE SERVEUR
+================================================
+
+Prérequis (une seule fois par serveur)
+--------------------------------------
+- IIS installé.
+- ASP.NET Core 8 Hosting Bundle :
+  https://dotnet.microsoft.com/download/dotnet/8.0
+  (section ASP.NET Core Runtime 8.0 > Windows > Hosting Bundle), puis « iisreset ».
+  C'est la seule différence avec l'application Titres : Suivi des mailles enregistre
+  les données sur le serveur et a donc besoin de ce module.
+
+Installation ou mise à jour
+---------------------------
+1. Dézipper ce fichier sur le serveur (par exemple dans C:\Temp\SuiviMailles).
+2. Clic droit sur le menu Démarrer > Terminal (administrateur) ou PowerShell (administrateur).
+3. Lancer :
+     cd C:\Temp\SuiviMailles
+     powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1
+4. Ouvrir http://localhost:8082/
+
+Options : -Port 8090  -Dossier D:\Sites\SuiviMailles  -NomSite SuiviMailles
+
+Une mise à jour se fait de la même façon avec le nouveau zip : les données
+(App_Data\mailles.json) et appsettings.json ne sont jamais écrasés.
+
+Installation manuelle (sans le script)
+--------------------------------------
+1. Copier le contenu du zip dans C:\inetpub\SuiviMailles (sauf ce fichier et le script).
+2. IIS : créer un pool d'applications « SuiviMailles », version CLR .NET : « Aucun code managé ».
+3. IIS : créer un site « SuiviMailles », dossier C:\inetpub\SuiviMailles, port 8082, pool SuiviMailles.
+4. Créer C:\inetpub\SuiviMailles\App_Data et donner le droit « Modifier » au compte
+   « IIS AppPool\SuiviMailles ».
+5. Ouvrir http://localhost:8082/
+
+Données
+-------
+- Au premier démarrage, App_Data\mailles.json est créé avec les 7 mailles de départ.
+- Sauvegarde : copier App_Data\mailles.json.
+
+En cas de problème
+------------------
+- Erreur 500.19 ou 500.21 : le Hosting Bundle n'est pas installé (ou iisreset n'a pas été fait).
+- Erreur 500.30 : passer stdoutLogEnabled="true" dans web.config, recharger la page,
+  lire le fichier dans le dossier logs\ puis remettre "false".
+- Les statuts ne s'enregistrent pas : vérifier le droit « Modifier » du pool sur App_Data.

@@ -46,14 +46,23 @@ Ce fichier est construit depuis un export `adresses_de_facturation.csv` :
 `node tools/seed-depuis-csv.mjs <adresses_de_facturation.csv> src/SuiviMailles/Data/mailles.seed.json`.
 Le fichier de données n'est jamais publié : un redéploiement n'écrase pas les statuts saisis.
 
-## Déploiement sur IIS
+## Déploiement sur IIS (zip)
 
-1. Installer le **ASP.NET Core 8 Hosting Bundle** sur le serveur, puis `iisreset`.
-2. Publier : `dotnet publish src/SuiviMailles -c Release -o publish`
-3. Copier `publish/` dans le dossier du site (ex. `D:\Sites\SuiviMailles`).
-4. Dans IIS : créer le site ou l'application, pool d'applications en **Aucun code managé**.
-5. Donner au compte du pool (`IIS AppPool\<nom du pool>`) le droit **Modifier** sur le dossier de données
-   (`App_Data` par défaut).
+Comme pour l'application Titres, l'application s'installe à partir d'un zip :
+
+1. Récupérer `SuiviMailles.zip` : onglet **Actions** du dépôt > dernière exécution « Zip d'installation » >
+   artefact **SuiviMailles** ; ou onglet **Releases** pour une version taguée (`git tag v1.0.0 && git push origin v1.0.0`).
+2. Prérequis serveur, une seule fois : **ASP.NET Core 8 Hosting Bundle**, puis `iisreset`.
+3. Dézipper sur le serveur et lancer en administrateur :
+   `powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1`
+4. Ouvrir http://localhost:8082/
+
+Le script crée le pool (Aucun code managé), le site sur le port 8082 et les droits sur `App_Data`.
+Relancé avec un nouveau zip, il fait la mise à jour sans toucher aux données ni à `appsettings.json`.
+Détails et installation manuelle : `deploiement/LISEZMOI.txt`.
+
+Le zip est construit par `.github/workflows/zip.yml`, qui vérifie aussi que l'API démarre et répond
+(liste, statut, import, export, suppression) avant de le publier.
 
 Pour garder les données hors du dossier du site, définir le chemin dans `appsettings.json` :
 

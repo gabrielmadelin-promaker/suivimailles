@@ -1,0 +1,67 @@
+name: Zip d'installation
+
+# Construit SuiviMailles.zip (application publiée + script d'installation IIS),
+# vérifie que l'application démarre et répond, puis le met à disposition :
+# - dans l'onglet Actions (artefact « SuiviMailles ») à chaque push ;
+# - en version téléchargeable (onglet Releases) pour chaque tag v* (ex. v1.0.0).
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publication
+        run: dotnet publish src/SuiviMailles -c Release -o paquet
+
+      - name: Vérification de l'API
+        run: |
+          cd paquet
+          ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet SuiviMailles.dll &
+          PID=$!
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5080/api/mailles >/dev/null && break; sleep 1; done
+          set -x
+          curl -sf http://127.0.0.1:5080/ | grep -q "Suivi des mailles"
+          test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
+          curl -sf -X PUT -H "Content-Type: application/json" -d '{"statut":"legitime"}' http://127.0.0.1:5080/api/mailles/0001/statut | jq -e '.statut == "legitime"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"statut":"autre"}' http://127.0.0.1:5080/api/mailles/0001/statut)" = 400
+          curl -sf -X POST -H "Content-Type: application/json" \
+            -d '{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"},{"numero":3,"siren":"123456789","maille":"123456789_TEST"},{"numero":4,"siren":"12","maille":""}]}' \
+            http://127.0.0.1:5080/api/mailles/import | jq -e '(.ajoutees | length) == 1 and .dejaPresentes == 1 and (.rejets | length) == 1'
+          test "$(curl -sf http://127.0.0.1:5080/api/siren.csv | wc -l)" = 3
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE http://127.0.0.1:5080/api/mailles/0008)" = 204
+          test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
+          jq -e '.[0].statut == "legitime"' App_Data/mailles.json
+          kill $PID
+          # Le zip ne doit contenir aucune donnée de test.
+          rm -rf App_Data logs
+
+      - name: Ajout du script d'installation
+        run: cp deploiement/Installer-SuiviMailles.ps1 deploiement/LISEZMOI.txt paquet/
+
+      - name: Artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuiviMailles
+          path: paquet/
+
+      - name: Version téléchargeable
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd paquet && zip -qr ../SuiviMailles-${GITHUB_REF_NAME}.zip . && cd ..
+          gh release create "$GITHUB_REF_NAME" "SuiviMailles-${GITHUB_REF_NAME}.zip" --title "Suivi des mailles $GITHUB_REF_NAME" --notes "Dézipper sur le serveur puis lancer Installer-SuiviMailles.ps1 en administrateur (voir LISEZMOI.txt)."
+        env:
+          GH_TOKEN: ${{ github.token }}
