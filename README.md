@@ -61,8 +61,10 @@ Le fichier de données n'est jamais publié : un redéploiement n'écrase pas le
 
 Comme pour l'application Titres, l'application s'installe à partir d'un zip :
 
-1. Récupérer `SuiviMailles.zip` : onglet **Actions** du dépôt > dernière exécution « Zip d'installation » >
-   artefact **SuiviMailles** ; ou onglet **Releases** pour une version taguée (`git tag v1.0.0 && git push origin v1.0.0`).
+1. Récupérer `SuiviMailles.zip` : fichier **`livraison/SuiviMailles.zip`** du dépôt (ouvrir le fichier sur GitHub,
+   bouton « Download raw file »), remis à jour automatiquement après chaque modification. Autres possibilités :
+   onglet **Actions** > dernière exécution « Zip d'installation » > artefact **SuiviMailles**, ou onglet **Releases**
+   pour une version taguée.
 2. Prérequis serveur, une seule fois : **ASP.NET Core 8 Hosting Bundle**, puis `iisreset`.
 3. Dézipper sur le serveur et lancer en administrateur :
    `powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1`

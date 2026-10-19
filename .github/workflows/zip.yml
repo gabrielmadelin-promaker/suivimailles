@@ -2,6 +2,8 @@ name: Zip d'installation
 
 # Construit SuiviMailles.zip (application publiée + script d'installation IIS),
 # vérifie que l'application démarre et répond, puis le met à disposition :
+# - dans le dépôt, fichier livraison/SuiviMailles.zip, à chaque push sur une branche
+#   (téléchargeable depuis la page du fichier sur GitHub, bouton « Download raw file ») ;
 # - dans l'onglet Actions (artefact « SuiviMailles ») à chaque push ;
 # - en version téléchargeable (onglet Releases) pour chaque tag v* (ex. v1.0.0).
 
@@ -9,6 +11,8 @@ on:
   push:
     branches: ["**"]
     tags: ["v*"]
+    # Le commit du zip lui-même ne relance pas la construction.
+    paths-ignore: ["livraison/**"]
   workflow_dispatch:
 
 permissions:
@@ -66,6 +70,19 @@ jobs:
         with:
           name: SuiviMailles
           path: paquet/
+
+      - name: Zip dans le dépôt
+        if: startsWith(github.ref, 'refs/heads/')
+        run: |
+          mkdir -p livraison
+          rm -f livraison/SuiviMailles.zip
+          (cd paquet && zip -qrX ../livraison/SuiviMailles.zip .)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add livraison/SuiviMailles.zip
+          git commit -m "Zip d'installation ${GITHUB_SHA::7}" || exit 0
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
 
       - name: Version téléchargeable
         if: startsWith(github.ref, 'refs/tags/v')
