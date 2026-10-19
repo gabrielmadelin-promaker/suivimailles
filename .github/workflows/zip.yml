@@ -45,6 +45,15 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:5080/api/mailles/0008/supprimer)" = 204
           test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
           jq -e '.[0].statut == "legitime"' App_Data/mailles.json
+          # Sociétés : renommage, import, report sur les mailles.
+          curl -sf -X POST -H "Content-Type: application/json" -d '{"siren":"055804124","nom":"Arval"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 4'
+          curl -sf -X POST -H "Content-Type: application/json" \
+            -d '{"lignes":[{"numero":2,"siren":"055804124","nom":"Arval Service Lease"},{"numero":3,"siren":"987654321","nom":"Nouvelle"},{"numero":4,"siren":"","nom":"X"}]}' \
+            http://127.0.0.1:5080/api/societes/import | jq -e '.ajoutees == 1 and .modifiees == 1 and (.rejets | length) == 1'
+          curl -sf http://127.0.0.1:5080/api/mailles | jq -e '[.[] | select(.siren == "055804124") | .societe] | all(. == "Arval Service Lease")'
+          test "$(curl -sf http://127.0.0.1:5080/api/societes | jq length)" = 4
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"12","nom":"x"}' http://127.0.0.1:5080/api/societes)" = 400
+          jq -e 'length == 3' App_Data/societes.json
           kill $PID
           # Le zip ne doit contenir aucune donnée de test.
           rm -rf App_Data logs

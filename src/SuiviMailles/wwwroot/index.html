@@ -23,6 +23,7 @@
 
   <nav class="onglets" role="tablist" aria-label="Sections">
     <button type="button" class="onglet" role="tab" data-onglet="mailles" aria-controls="panneau-mailles" aria-selected="true">Mailles</button>
+    <button type="button" class="onglet" role="tab" data-onglet="societes" aria-controls="panneau-societes" aria-selected="false">Sociétés</button>
     <button type="button" class="onglet" role="tab" data-onglet="import" aria-controls="panneau-import" aria-selected="false">Import / export</button>
   </nav>
 
@@ -76,6 +77,53 @@
       </table>
     </div>
   </section>
+  </div>
+
+  <div id="panneau-societes" role="tabpanel" class="panneau" hidden>
+    <section class="liste" aria-label="Liste des sociétés">
+      <div class="liste-tete">
+        <span id="compte-societes" class="affiches">Chargement…</span>
+        <span class="sub">Le nom saisi est reporté sur toutes les mailles du SIREN.</span>
+      </div>
+      <form id="form-societe" class="ajout-societe" novalidate>
+        <input id="ajout-nom" class="filtre" type="text" placeholder="Nom de la société" aria-label="Nom de la nouvelle société" autocomplete="off">
+        <input id="ajout-siren" class="filtre" type="text" placeholder="SIREN (9 chiffres)" aria-label="SIREN de la nouvelle société" inputmode="numeric" autocomplete="off">
+        <button class="btn principal" type="submit">Ajouter</button>
+      </form>
+      <div class="table-wrap">
+        <table class="table-societes">
+          <thead>
+            <tr><th scope="col">Société</th><th scope="col">SIREN</th><th scope="col" class="col-nb">Mailles</th></tr>
+            <tr class="filtres">
+              <th><input id="fs-nom" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
+              <th><input id="fs-siren" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par SIREN" inputmode="numeric" autocomplete="off"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="lignes-societes"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="carte">
+      <div class="carte-tete">
+        <h2>Importer les sociétés</h2>
+        <p class="sub">Fichier CSV avec une colonne SOCIETE et une colonne SIREN. Les SIREN inconnus sont ajoutés, les noms des SIREN connus sont mis à jour et reportés sur leurs mailles.</p>
+      </div>
+      <div class="modele" aria-label="Colonnes attendues">
+        <span class="col utile">SOCIETE</span><span class="col utile">SIREN</span>
+      </div>
+      <div class="actions">
+        <label class="btn" for="fichier-soc">Choisir le fichier…</label>
+        <input id="fichier-soc" class="visuellement-cache" type="file" accept=".csv,text/csv">
+        <span id="fichier-soc-info" class="sub">Aucun fichier choisi.</span>
+        <button id="importer-soc" class="btn principal" type="button" disabled>Importer</button>
+      </div>
+      <div id="resultat-soc" class="resultat" hidden>
+        <div id="resultat-soc-chiffres" class="chiffres"></div>
+        <div id="resultat-soc-rejets"></div>
+      </div>
+    </section>
   </div>
 
   <div id="panneau-import" role="tabpanel" class="panneau" hidden>

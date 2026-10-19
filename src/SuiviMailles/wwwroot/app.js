@@ -32,6 +32,29 @@
       // 404 : déjà supprimée par quelqu'un d'autre, le résultat attendu est atteint.
       if (!r.ok && r.status !== 404) throw new Error(`Suppression refusée par le serveur (HTTP ${r.status})`);
     },
+    async listerSocietes() {
+      const r = await fetch("api/societes", { headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error(`Chargement des sociétés impossible (HTTP ${r.status})`);
+      return r.json();
+    },
+    async definirSociete(siren, nom) {
+      const r = await fetch("api/societes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siren, nom }),
+      });
+      if (!r.ok) throw new Error(`Enregistrement refusé par le serveur (HTTP ${r.status})`);
+      return r.json();
+    },
+    async importerSocietes(lignes) {
+      const r = await fetch("api/societes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lignes }),
+      });
+      if (!r.ok) throw new Error(`Import refusé par le serveur (HTTP ${r.status})`);
+      return r.json();
+    },
     async importer(lignes) {
       const r = await fetch("api/mailles/import", {
         method: "POST",
@@ -45,17 +68,60 @@
 
   // En démonstration (artefact de test) : données embarquées, modifications gardées dans ce navigateur.
   const CLE = "suivimailles-demo-v3";
+  const CLE_SOCIETES = "suivimailles-demo-societes-v1";
   const demoStore = {
     demo: true,
     _donnees: [],
+    _societes: {},
     _sauver() {
-      try { localStorage.setItem(CLE, JSON.stringify(this._donnees)); } catch { /* valable jusqu'au rechargement */ }
+      try {
+        localStorage.setItem(CLE, JSON.stringify(this._donnees));
+        localStorage.setItem(CLE_SOCIETES, JSON.stringify(this._societes));
+      } catch { /* valable jusqu'au rechargement */ }
     },
     async lister() {
-      let sauvees = null;
-      try { sauvees = JSON.parse(localStorage.getItem(CLE) || "null"); } catch { /* stockage indisponible */ }
+      let sauvees = null, societes = null;
+      try {
+        sauvees = JSON.parse(localStorage.getItem(CLE) || "null");
+        societes = JSON.parse(localStorage.getItem(CLE_SOCIETES) || "null");
+      } catch { /* stockage indisponible */ }
       this._donnees = Array.isArray(sauvees) ? sauvees : structuredClone(window.SUIVI_DEMO_DATA || []);
+      this._societes = societes && typeof societes === "object" ? societes : {};
       return structuredClone(this._donnees);
+    },
+    // Mêmes règles que MailleStore côté serveur (référentiel SIREN -> nom, recopié sur les mailles).
+    async listerSocietes() {
+      const nb = {};
+      for (const m of this._donnees) nb[m.siren] = (nb[m.siren] || 0) + 1;
+      const sirens = new Set([...Object.keys(this._societes), ...Object.keys(nb)]);
+      return [...sirens].map(siren => ({ siren, nom: this._societes[siren] || "", nbMailles: nb[siren] || 0 }))
+        .sort((a, b) => (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr") || a.siren.localeCompare(b.siren));
+    },
+    _appliquer(siren, nom) {
+      if (nom) this._societes[siren] = nom; else delete this._societes[siren];
+      for (const m of this._donnees) if (m.siren === siren) m.societe = nom;
+    },
+    async definirSociete(siren, nom) {
+      if (!/^[0-9]{9}$/.test(siren)) throw new Error("SIREN invalide");
+      this._appliquer(siren, nom.trim());
+      this._sauver();
+      return { siren, nom: this._societes[siren] || "", nbMailles: this._donnees.filter(m => m.siren === siren).length };
+    },
+    async importerSocietes(lignes) {
+      let ajoutees = 0, modifiees = 0, inchangees = 0;
+      const rejets = [];
+      for (const l of lignes) {
+        const siren = String(l.siren).replace(/\s/g, ""), nom = String(l.nom).trim();
+        if (!/^[0-9]{9}$/.test(siren)) { rejets.push({ numero: l.numero, raison: siren ? `SIREN invalide « ${l.siren} »` : "SIREN manquant" }); continue; }
+        if (!nom) { rejets.push({ numero: l.numero, raison: "Nom de société vide" }); continue; }
+        const actuel = this._societes[siren];
+        if (actuel === undefined) ajoutees++;
+        else if (actuel === nom) { inchangees++; continue; }
+        else modifiees++;
+        this._appliquer(siren, nom);
+      }
+      if (ajoutees + modifiees) this._sauver();
+      return { ajoutees, modifiees, inchangees, rejets };
     },
     async changerStatut(id, statut) {
       const m = this._donnees.find(x => x.id === id);
@@ -77,13 +143,13 @@
       for (const l of lignes) {
         const siren = String(l.siren).replace(/\s/g, "");
         const maille = String(l.maille).trim();
-        if (!/^[0-9]{9}$/.test(siren)) { rejets.push({ numero: l.numero, raison: `SIREN invalide « ${l.siren} »` }); continue; }
+        if (!/^[0-9]{9}$/.test(siren)) { rejets.push({ numero: l.numero, raison: siren ? `SIREN invalide « ${l.siren} »` : "SIREN manquant" }); continue; }
         if (!maille) { rejets.push({ numero: l.numero, raison: "Maille vide" }); continue; }
         if (connues.has(cle(siren, maille))) { dejaPresentes++; continue; }
         connues.add(cle(siren, maille));
         const m = {
           id: String(prochainId++).padStart(4, "0"),
-          societe: this._donnees.find(x => x.siren === siren && x.societe)?.societe ?? "",
+          societe: this._societes[siren] || "",
           siren, maille, statut: "nouveau", modifieLe: new Date().toISOString(),
         };
         this._donnees.push(m);
@@ -93,14 +159,17 @@
       return { ajoutees, dejaPresentes, rejets };
     },
     reinitialiser() {
-      try { localStorage.removeItem(CLE); } catch { /* rien à faire */ }
+      try { localStorage.removeItem(CLE); localStorage.removeItem(CLE_SOCIETES); } catch { /* rien à faire */ }
     },
   };
 
   const store = window.SUIVI_DEMO_DATA ? demoStore : apiStore;
 
   // --- État ---------------------------------------------------------------
-  const etat = { mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" } };
+  const etat = {
+    mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
+    societes: [], filtresSocietes: { nom: "", siren: "" },
+  };
 
   const $ = sel => document.querySelector(sel);
   // Sociétés non renseignées (mailles importées) en fin de liste.
@@ -278,6 +347,7 @@
       rendre();
       rendreExport();
       toast(`Maille ${maille.maille} supprimée`);
+      rafraichirSocietes();
     } catch (err) {
       toast(`${err.message}. La maille n'a pas été supprimée.`);
     } finally {
@@ -299,12 +369,13 @@
     for (const b of document.querySelectorAll(".onglet")) b.setAttribute("aria-selected", String(b.dataset.onglet === nom));
     for (const p of document.querySelectorAll("[role=tabpanel]")) p.hidden = p.id !== `panneau-${nom}`;
     if (nom === "import") rendreExport();
+    if (nom === "societes") rendreSocietes();
   }
   document.querySelector(".onglets").addEventListener("click", e => {
     const b = e.target.closest(".onglet");
     if (!b) return;
     afficherOnglet(b.dataset.onglet);
-    try { history.replaceState(null, "", b.dataset.onglet === "import" ? "#import" : "#mailles"); } catch { /* sans importance */ }
+    try { history.replaceState(null, "", `#${b.dataset.onglet}`); } catch { /* sans importance */ }
   });
 
   // --- Export des SIREN ----------------------------------------------------------
@@ -407,6 +478,7 @@
       rendre();
       rendreExport();
       afficherResultat(r);
+      rafraichirSocietes();
       $("#fichier").value = "";
       $("#fichier-info").textContent = "Aucun fichier choisi.";
       lignesLues = null;
@@ -435,6 +507,191 @@
     toast(`Import terminé : ${pl(ajoutees.length, "maille")} ajoutée${ajoutees.length > 1 ? "s" : ""}`);
   }
 
+  // --- Sociétés ------------------------------------------------------------------
+  async function rafraichirSocietes() {
+    try {
+      etat.societes = await store.listerSocietes();
+    } catch (err) {
+      $("#lignes-societes").innerHTML = `<tr><td colspan="3" class="vide">${esc(err.message)}</td></tr>`;
+      return;
+    }
+    rendreSocietes();
+  }
+
+  function compterSocietes(nbVisibles = etat.societes.length) {
+    const total = etat.societes.length, sansNom = etat.societes.filter(s => !s.nom).length;
+    $("#compte-societes").textContent = `${total} société${total > 1 ? "s" : ""}` +
+      (sansNom ? `, dont ${sansNom} sans nom` : "") +
+      (nbVisibles !== total ? ` · ${nbVisibles} affichée${nbVisibles > 1 ? "s" : ""}` : "");
+  }
+
+  function rendreSocietes() {
+    const f = etat.filtresSocietes;
+    const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
+    compterSocietes(visibles.length);
+    $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `
+      <tr data-siren="${esc(s.siren)}">
+        <td><input class="nom-societe" type="text" value="${esc(s.nom)}" data-initial="${esc(s.nom)}" placeholder="Saisir le nom de la société"
+             aria-label="Nom de la société ${esc(formatSiren(s.siren))}" autocomplete="off"></td>
+        <td class="siren">${surligner(formatSiren(s.siren), f.siren, true)}</td>
+        <td class="nb">${s.nbMailles
+          ? `<button type="button" class="lien-mailles" title="Voir les mailles de ce SIREN">${s.nbMailles} maille${s.nbMailles > 1 ? "s" : ""}</button>`
+          : '<span class="inconnue">Aucune</span>'}</td>
+      </tr>`).join("")
+      : `<tr><td colspan="3" class="vide">${etat.societes.length ? "Aucune société ne correspond aux filtres." : "Aucune société : importez un fichier ou ajoutez-en une ci-dessus."}</td></tr>`;
+  }
+
+  // Reporte le nom sur les mailles déjà chargées, sans recharger la page.
+  function reporterNom(siren, nom) {
+    for (const m of etat.mailles) if (m.siren === siren) m.societe = nom;
+    etat.mailles.sort(tri);
+    rendre();
+    const s = etat.societes.find(x => x.siren === siren);
+    if (s) s.nom = nom;
+  }
+
+  async function enregistrerSociete(siren, nom) {
+    const vue = await store.definirSociete(siren, nom);
+    reporterNom(vue.siren, vue.nom);
+    if (!etat.societes.some(x => x.siren === vue.siren)) etat.societes.push(vue);
+    return vue;
+  }
+
+  for (const champ of ["nom", "siren"]) {
+    $(`#fs-${champ}`).addEventListener("input", e => { etat.filtresSocietes[champ] = e.target.value; rendreSocietes(); });
+  }
+
+  // Renommage directement dans la liste : enregistré quand on quitte le champ ou avec Entrée ; Échap annule.
+  $("#lignes-societes").addEventListener("keydown", e => {
+    const champ = e.target.closest("input.nom-societe");
+    if (!champ) return;
+    if (e.key === "Enter") champ.blur();
+    if (e.key === "Escape") { champ.value = champ.dataset.initial; champ.blur(); }
+  });
+  $("#lignes-societes").addEventListener("change", async e => {
+    const champ = e.target.closest("input.nom-societe");
+    if (!champ) return;
+    const siren = champ.closest("tr").dataset.siren;
+    const nom = champ.value.trim();
+    if (nom === champ.dataset.initial) return;
+    champ.setAttribute("aria-busy", "true");
+    try {
+      await enregistrerSociete(siren, nom);
+      champ.dataset.initial = nom;
+      champ.value = nom;
+      // Pas de nouveau rendu de la liste ici : le focus est peut-être déjà dans la ligne suivante.
+      compterSocietes(document.querySelectorAll("#lignes-societes tr[data-siren]").length);
+      const nb = etat.mailles.filter(m => m.siren === siren).length;
+      toast(nom ? `${formatSiren(siren)} : « ${nom} »${nb ? `, reporté sur ${nb} maille${nb > 1 ? "s" : ""}` : ""}` : `Nom effacé pour ${formatSiren(siren)}`);
+    } catch (err) {
+      champ.value = champ.dataset.initial;
+      toast(`${err.message}. Le nom n'a pas été modifié.`);
+    } finally {
+      champ.removeAttribute("aria-busy");
+    }
+  });
+  $("#lignes-societes").addEventListener("click", e => {
+    const btn = e.target.closest("button.lien-mailles");
+    if (!btn) return;
+    const siren = btn.closest("tr").dataset.siren;
+    etat.filtres = { societe: "", siren, maille: "", statut: "" };
+    for (const id of ["f-societe", "f-maille", "f-statut"]) $(`#${id}`).value = "";
+    $("#f-siren").value = siren;
+    rendre();
+    afficherOnglet("mailles");
+    try { history.replaceState(null, "", "#mailles"); } catch { /* sans importance */ }
+  });
+
+  $("#form-societe").addEventListener("submit", async e => {
+    e.preventDefault();
+    let siren = $("#ajout-siren").value.replace(/\s/g, "");
+    const nom = $("#ajout-nom").value.trim();
+    if (!/^[0-9]{9}$/.test(siren)) { toast("Le SIREN doit comporter 9 chiffres."); $("#ajout-siren").focus(); return; }
+    if (!nom) { toast("Saisissez le nom de la société."); $("#ajout-nom").focus(); return; }
+    const existait = etat.societes.find(x => x.siren === siren);
+    try {
+      await enregistrerSociete(siren, nom);
+      etat.societes = await store.listerSocietes();
+      rendreSocietes();
+      $("#form-societe").reset();
+      $("#ajout-siren").focus();
+      toast(existait?.nom ? `Société ${formatSiren(siren)} renommée en « ${nom} »` : `Société « ${nom} » ajoutée`);
+    } catch (err) {
+      toast(`${err.message}. La société n'a pas été enregistrée.`);
+    }
+  });
+
+  // Import du référentiel : colonnes SOCIETE et SIREN, repérées par l'en-tête (sinon société puis SIREN).
+  let societesLues = null;
+
+  function extraireSocietes(texte) {
+    const brutes = lireCsv(texte);
+    if (!brutes.length) return [];
+    const entete = brutes[0].map(norm);
+    let colSiren = entete.findIndex(c => c.includes("siren"));
+    let colNom = entete.findIndex(c => /soci|raison|nom/.test(c));
+    const aEntete = colSiren >= 0 || colNom >= 0;
+    if (colSiren < 0 || colNom < 0) {
+      // Sans en-tête reconnu : la colonne qui ne contient que des chiffres est le SIREN.
+      const exemple = brutes[aEntete ? 1 : 0] || [];
+      const premiereNumerique = /^[0-9\s]+$/.test(exemple[0] ?? "");
+      colSiren = premiereNumerique ? 0 : 1;
+      colNom = premiereNumerique ? 1 : 0;
+    }
+    const resultat = [];
+    brutes.forEach((cols, i) => {
+      if (i === 0 && aEntete) return;
+      if (cols.every(c => !c.trim())) return;
+      let siren = (cols[colSiren] ?? "").replace(/\s/g, "");
+      if (/^[0-9]{1,8}$/.test(siren)) siren = siren.padStart(9, "0");
+      resultat.push({ numero: i + 1, siren, nom: (cols[colNom] ?? "").trim() });
+    });
+    return resultat;
+  }
+
+  $("#fichier-soc").addEventListener("change", async e => {
+    const f = e.target.files[0];
+    $("#resultat-soc").hidden = true;
+    societesLues = null;
+    $("#importer-soc").disabled = true;
+    if (!f) { $("#fichier-soc-info").textContent = "Aucun fichier choisi."; return; }
+    societesLues = extraireSocietes(decoder(await f.arrayBuffer()));
+    $("#fichier-soc-info").textContent = `${f.name} : ${societesLues.length} ligne${societesLues.length > 1 ? "s" : ""} de données lue${societesLues.length > 1 ? "s" : ""}.`;
+    $("#importer-soc").disabled = societesLues.length === 0;
+  });
+
+  $("#importer-soc").addEventListener("click", async () => {
+    if (!societesLues?.length) return;
+    const btn = $("#importer-soc");
+    btn.disabled = true;
+    btn.textContent = "Import en cours…";
+    try {
+      const r = await store.importerSocietes(societesLues);
+      etat.mailles = await store.lister();
+      etat.mailles.sort(tri);
+      rendre();
+      await rafraichirSocietes();
+      $("#resultat-soc-chiffres").innerHTML = `
+        <span class="chiffre ok"><b>${r.ajoutees}</b> ajoutée${r.ajoutees > 1 ? "s" : ""}</span>
+        <span class="chiffre ok"><b>${r.modifiees}</b> renommée${r.modifiees > 1 ? "s" : ""}</span>
+        <span class="chiffre"><b>${r.inchangees}</b> inchangée${r.inchangees > 1 ? "s" : ""}</span>
+        <span class="chiffre ${r.rejets.length ? "ko" : ""}"><b>${r.rejets.length}</b> ligne${r.rejets.length > 1 ? "s" : ""} ignorée${r.rejets.length > 1 ? "s" : ""}</span>`;
+      $("#resultat-soc-rejets").innerHTML = r.rejets.length
+        ? `<p class="titre-rejets">Lignes ignorées</p><ul>${r.rejets.map(x => `<li>Ligne ${x.numero} : ${esc(x.raison)}</li>`).join("")}</ul>`
+        : "";
+      $("#resultat-soc").hidden = false;
+      $("#fichier-soc").value = "";
+      $("#fichier-soc-info").textContent = "Aucun fichier choisi.";
+      societesLues = null;
+      toast(`Import terminé : ${r.ajoutees + r.modifiees} société${r.ajoutees + r.modifiees > 1 ? "s" : ""} enregistrée${r.ajoutees + r.modifiees > 1 ? "s" : ""}`);
+    } catch (err) {
+      toast(`${err.message}. Aucune société n'a été modifiée.`);
+      btn.disabled = false;
+    } finally {
+      btn.textContent = "Importer";
+    }
+  });
+
   // --- Démarrage -------------------------------------------------------------
   async function charger() {
     try {
@@ -446,7 +703,8 @@
     etat.mailles.sort(tri);
     rendre();
     rendreExport();
+    await rafraichirSocietes();
   }
-  afficherOnglet(location.hash === "#import" ? "import" : "mailles");
+  afficherOnglet(["#societes", "#import"].includes(location.hash) ? location.hash.slice(1) : "mailles");
   charger();
 })();

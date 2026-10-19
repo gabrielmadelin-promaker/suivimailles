@@ -4,7 +4,9 @@ using System.Text.RegularExpressions;
 namespace SuiviMailles;
 
 /// <summary>
-/// Stockage des mailles dans un fichier JSON sur le serveur applicatif (pas de base SQL).
+/// Stockage des mailles (mailles.json) et du référentiel des sociétés (societes.json) sur le serveur applicatif (pas de base SQL).
+/// Le nom de la société est recopié sur chaque maille du SIREN, pour que mailles.json reste lisible seul.
+/// Stockage dans des fichiers JSON sur le serveur applicatif (pas de base SQL).
 /// Les données sont gardées en mémoire ; chaque modification réécrit le fichier de façon atomique.
 /// </summary>
 public sealed class MailleStore
@@ -12,6 +14,8 @@ public sealed class MailleStore
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private readonly string _fichier;
+    private readonly string _fichierSocietes;
+    private readonly Dictionary<string, string> _societes = new();
     private readonly SemaphoreSlim _verrou = new(1, 1);
     private readonly ILogger<MailleStore> _logger;
     private List<LigneMaille> _mailles;
@@ -33,6 +37,20 @@ public sealed class MailleStore
             ? JsonSerializer.Deserialize<List<LigneMaille>>(File.ReadAllText(_fichier), Json) ?? []
             : [];
         _logger.LogInformation("{Nombre} mailles chargées depuis {Fichier}", _mailles.Count, _fichier);
+
+        _fichierSocietes = Path.Combine(Path.GetDirectoryName(_fichier)!, "societes.json");
+        if (File.Exists(_fichierSocietes))
+        {
+            foreach (var s in JsonSerializer.Deserialize<List<Societe>>(File.ReadAllText(_fichierSocietes), Json) ?? [])
+                _societes[s.Siren] = s.Nom;
+        }
+        else
+        {
+            // Première version du référentiel : reprise des noms déjà saisis sur les mailles.
+            foreach (var m in _mailles.Where(m => m.Societe != ""))
+                _societes.TryAdd(m.Siren, m.Societe);
+            EcrireAsync(_fichierSocietes, SocietesAPlat()).GetAwaiter().GetResult();
+        }
     }
 
     public async Task<IReadOnlyList<LigneMaille>> ListerAsync()
@@ -102,15 +120,15 @@ public sealed class MailleStore
             {
                 var siren = Regex.Replace(ligne.Siren ?? "", @"\s", "");
                 var maille = (ligne.Maille ?? "").Trim();
-                if (!Regex.IsMatch(siren, @"^[0-9]{9}$")) { rejets.Add(new(ligne.Numero, $"SIREN invalide « {ligne.Siren} »")); continue; }
+                if (!Regex.IsMatch(siren, @"^[0-9]{9}$")) { rejets.Add(new(ligne.Numero, siren.Length == 0 ? "SIREN manquant" : $"SIREN invalide « {ligne.Siren} »")); continue; }
                 if (maille.Length == 0) { rejets.Add(new(ligne.Numero, "Maille vide")); continue; }
                 if (!connues.Add(Cle(siren, maille))) { dejaPresentes++; continue; }
 
                 var nouvelle = new LigneMaille
                 {
                     Id = (prochainId++).ToString("0000"),
-                    // La société n'est pas dans le fichier d'import : reprise d'une maille existante du même SIREN si possible.
-                    Societe = _mailles.FirstOrDefault(m => m.Siren == siren && m.Societe != "")?.Societe ?? "",
+                    // La société n'est pas dans le fichier d'import : elle vient du référentiel des sociétés.
+                    Societe = _societes.GetValueOrDefault(siren, ""),
                     Siren = siren,
                     Maille = maille,
                     Statut = Statuts.Nouveau,
@@ -128,17 +146,93 @@ public sealed class MailleStore
         finally { _verrou.Release(); }
     }
 
+    public async Task<IReadOnlyList<SocieteVue>> ListerSocietesAsync()
+    {
+        await _verrou.WaitAsync();
+        try
+        {
+            var nbMailles = _mailles.GroupBy(m => m.Siren).ToDictionary(g => g.Key, g => g.Count());
+            return _societes.Keys.Union(nbMailles.Keys)
+                .Select(siren => new SocieteVue(siren, _societes.GetValueOrDefault(siren, ""), nbMailles.GetValueOrDefault(siren)))
+                .OrderBy(s => s.Nom == "").ThenBy(s => s.Nom, StringComparer.CurrentCultureIgnoreCase).ThenBy(s => s.Siren)
+                .ToList();
+        }
+        finally { _verrou.Release(); }
+    }
+
+    /// <summary>Crée ou renomme une société ; le nom est reporté sur toutes les mailles du SIREN.</summary>
+    public async Task<SocieteVue?> DefinirSocieteAsync(string siren, string nom)
+    {
+        siren = Regex.Replace(siren ?? "", @"\s", "");
+        if (!Regex.IsMatch(siren, @"^[0-9]{9}$")) return null;
+
+        await _verrou.WaitAsync();
+        try
+        {
+            Appliquer(siren, (nom ?? "").Trim());
+            await EcrireAsync(_fichierSocietes, SocietesAPlat());
+            await EcrireAsync();
+            return new SocieteVue(siren, _societes.GetValueOrDefault(siren, ""), _mailles.Count(m => m.Siren == siren));
+        }
+        finally { _verrou.Release(); }
+    }
+
+    /// <summary>Ajoute les SIREN inconnus et met à jour le nom des SIREN connus.</summary>
+    public async Task<ResultatImportSocietes> ImporterSocietesAsync(IEnumerable<LigneImportSociete> lignes)
+    {
+        await _verrou.WaitAsync();
+        try
+        {
+            int ajoutees = 0, modifiees = 0, inchangees = 0;
+            var rejets = new List<Rejet>();
+            foreach (var ligne in lignes)
+            {
+                var siren = Regex.Replace(ligne.Siren ?? "", @"\s", "");
+                var nom = (ligne.Nom ?? "").Trim();
+                if (!Regex.IsMatch(siren, @"^[0-9]{9}$")) { rejets.Add(new(ligne.Numero, siren.Length == 0 ? "SIREN manquant" : $"SIREN invalide « {ligne.Siren} »")); continue; }
+                if (nom.Length == 0) { rejets.Add(new(ligne.Numero, "Nom de société vide")); continue; }
+
+                if (!_societes.TryGetValue(siren, out var actuel)) ajoutees++;
+                else if (actuel == nom) { inchangees++; continue; }
+                else modifiees++;
+                Appliquer(siren, nom);
+            }
+
+            if (ajoutees + modifiees > 0)
+            {
+                await EcrireAsync(_fichierSocietes, SocietesAPlat());
+                await EcrireAsync();
+            }
+            _logger.LogInformation("Import sociétés : {Ajoutees} ajoutées, {Modifiees} modifiées, {Inchangees} inchangées, {Rejets} rejetées",
+                ajoutees, modifiees, inchangees, rejets.Count);
+            return new ResultatImportSocietes(ajoutees, modifiees, inchangees, rejets);
+        }
+        finally { _verrou.Release(); }
+    }
+
+    private void Appliquer(string siren, string nom)
+    {
+        if (nom.Length == 0) _societes.Remove(siren);
+        else _societes[siren] = nom;
+        foreach (var m in _mailles.Where(m => m.Siren == siren)) m.Societe = nom;
+    }
+
     private static string Cle(string siren, string maille) => $"{siren}|{maille.Trim()}";
 
-    private async Task EcrireAsync()
+    private Task EcrireAsync() => EcrireAsync(_fichier, _mailles);
+
+    private List<Societe> SocietesAPlat() =>
+        _societes.Select(kv => new Societe(kv.Key, kv.Value)).OrderBy(s => s.Siren, StringComparer.Ordinal).ToList();
+
+    private static async Task EcrireAsync<T>(string fichier, T contenu)
     {
         // Écriture dans un fichier temporaire puis remplacement : un arrêt du pool IIS en pleine écriture
         // ne laisse jamais un fichier tronqué.
-        var tmp = _fichier + ".tmp";
+        var tmp = fichier + ".tmp";
         await using (var flux = File.Create(tmp))
         {
-            await JsonSerializer.SerializeAsync(flux, _mailles, Json);
+            await JsonSerializer.SerializeAsync(flux, contenu, Json);
         }
-        File.Move(tmp, _fichier, overwrite: true);
+        File.Move(tmp, fichier, overwrite: true);
     }
 }

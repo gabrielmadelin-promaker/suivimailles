@@ -31,3 +31,14 @@ public sealed record DemandeImport(IReadOnlyList<LigneImport> Lignes);
 public sealed record Rejet(int Numero, string Raison);
 
 public sealed record ResultatImport(IReadOnlyList<LigneMaille> Ajoutees, int DejaPresentes, IReadOnlyList<Rejet> Rejets);
+
+/// <summary>Référentiel des sociétés : un nom par SIREN.</summary>
+public sealed record Societe(string Siren, string Nom);
+
+public sealed record SocieteVue(string Siren, string Nom, int NbMailles);
+
+public sealed record LigneImportSociete(int Numero, string Siren, string Nom);
+
+public sealed record DemandeImportSocietes(IReadOnlyList<LigneImportSociete> Lignes);
+
+public sealed record ResultatImportSocietes(int Ajoutees, int Modifiees, int Inchangees, IReadOnlyList<Rejet> Rejets);

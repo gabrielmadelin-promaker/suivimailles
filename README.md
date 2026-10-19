@@ -10,6 +10,10 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
 - Bouton corbeille sur chaque ligne : supprime la maille après confirmation (avertissement : suppression définitive,
   la maille sera recréée en « Nouveau » si elle figure encore dans un prochain import). Chaque suppression est tracée
   dans le journal de l'application.
+- Onglet **Sociétés** : référentiel SOCIÉTÉ / SIREN. Le nom se modifie directement dans la liste (Entrée ou sortie du champ
+  pour enregistrer, Échap pour annuler) et est reporté sur toutes les mailles du SIREN ; les mailles importées plus tard
+  le reprennent aussi. Ajout manuel, filtres, lien vers les mailles du SIREN, et import d'un CSV `SOCIETE;SIREN`
+  (colonnes repérées par l'en-tête) : SIREN inconnus ajoutés, noms des SIREN connus mis à jour.
 - Onglet **Import / export** :
   - **Exporter siren.csv** : les SIREN distincts, un par ligne, sans en-tête.
   - **Ouvrir l'annuaire** : lien vers l'annuaire de la facturation électronique (https://facturation.chorus-pro.gouv.fr/annuaire), dans un nouvel onglet.
@@ -26,7 +30,7 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
 Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
                          └─ SuiviMailles.dll (ASP.NET Core 8, API minimale)
                                ├─ wwwroot/            interface (HTML/CSS/JS, sans framework)
-                               └─ App_Data/mailles.json   données (pas de base SQL)
+                               └─ App_Data/mailles.json, societes.json   données (pas de base SQL)
 ```
 
 | Appel | Rôle |
@@ -34,6 +38,9 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 | `GET  api/mailles` | Liste des mailles |
 | `POST api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
 | `POST api/mailles/{id}/supprimer` | Supprime une maille |
+| `GET  api/societes` | Référentiel des sociétés (SIREN, nom, nombre de mailles) |
+| `POST api/societes` — corps `{"siren":"055804124","nom":"…"}` | Crée ou renomme une société (nom reporté sur ses mailles) |
+| `POST api/societes/import` — corps `{"lignes":[{"numero":2,"siren":"…","nom":"…"}]}` | Import du référentiel |
 | `GET  api/siren.csv` | Export des SIREN distincts |
 | `POST api/mailles/import` — corps `{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"}]}` | Ajoute les mailles absentes (le CSV est lu dans le navigateur, le serveur revalide chaque ligne) |
 

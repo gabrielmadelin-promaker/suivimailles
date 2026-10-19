@@ -200,3 +200,23 @@ button.supprimer:focus-visible { outline: 2px solid var(--focus); outline-offset
 .btn.lien-externe { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-weight: 500; }
 .btn.lien-externe:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .url { font-family: var(--font-data); font-size: 12px; overflow-wrap: anywhere; }
+
+/* Sociétés */
+.ajout-societe { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.table-societes { min-width: 520px; }
+.col-nb { width: 120px; }
+input.nom-societe {
+  width: 100%; font: inherit; font-weight: 500; color: var(--fg); background: transparent;
+  border: 1px solid transparent; border-radius: 5px; padding: 5px 8px;
+}
+input.nom-societe:hover { border-color: var(--line); }
+input.nom-societe:focus { outline: none; border-color: var(--focus); background: var(--bg); }
+input.nom-societe::placeholder { color: var(--muted); font-style: italic; font-weight: 400; }
+input.nom-societe[aria-busy="true"] { opacity: .6; }
+button.lien-mailles {
+  font: inherit; font-size: 13px; color: var(--nouveau); background: transparent; border: 0; padding: 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; font-variant-numeric: tabular-nums;
+}
+button.lien-mailles:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.actions:has(#fichier-soc:focus-visible) label.btn { outline: 2px solid var(--focus); outline-offset: 1px; }
+@media (max-width: 560px) { .ajout-societe { grid-template-columns: 1fr; } }

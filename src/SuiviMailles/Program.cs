@@ -50,4 +50,21 @@ api.MapPost("/import", async (DemandeImport demande, MailleStore store, HttpCont
     return Results.Ok(await store.ImporterAsync(demande.Lignes, utilisateur));
 });
 
+var societes = app.MapGroup("/api/societes");
+
+societes.MapGet("/", async (MailleStore store) => Results.Ok(await store.ListerSocietesAsync()));
+
+// Création ou renommage d'une société (nom vide : efface le nom).
+societes.MapPost("/", async (Societe corps, MailleStore store) =>
+    await store.DefinirSocieteAsync(corps.Siren, corps.Nom) is { } vue
+        ? Results.Ok(vue)
+        : Results.BadRequest(new { erreur = $"SIREN invalide : {corps.Siren}" }));
+
+societes.MapPost("/import", async (DemandeImportSocietes demande, MailleStore store) =>
+{
+    if (demande.Lignes is null || demande.Lignes.Count == 0)
+        return Results.BadRequest(new { erreur = "Aucune ligne à importer." });
+    return Results.Ok(await store.ImporterSocietesAsync(demande.Lignes));
+});
+
 app.Run();
