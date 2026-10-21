@@ -51,6 +51,7 @@ jobs:
             curl -sf -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\"}" $U/api/auth/code | jq -e '.expiration' >/dev/null
             CODE=$(python3 -c "import email,glob,re; m=email.message_from_file(open(glob.glob('App_Data/mails/*.eml')[0])); t=''.join(p.get_payload(decode=True).decode() for p in m.walk() if p.get_content_type()=='text/plain'); print(re.search(r'Suivi des mailles : (\S{10})', t).group(1))")
             test ${#CODE} = 10
+            echo -n "$CODE" > /tmp/dernier-code.txt
             curl -sf -c "$2" -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\",\"code\":\"$CODE\"}" $U/api/auth/connexion
           }
           set -x
@@ -64,7 +65,8 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local","code":"mauvais"}' $U/api/auth/connexion)" = 400
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local"}' $U/api/auth/code)" = 429
           jq -e '."admin@test.local".expiration | test("T23:59:59")' App_Data/codes.json
-          if grep -qF -- "$CODE" App_Data/codes.json; then echo "code en clair dans codes.json"; exit 1; fi
+          test -s /tmp/dernier-code.txt
+          if grep -qF -f /tmp/dernier-code.txt App_Data/codes.json; then echo "code en clair dans codes.json"; exit 1; fi
           curl -sf -b /tmp/admin.txt $U/api/auth/moi | jq -e '.email == "admin@test.local"'
           test "$(curl -sf -b /tmp/admin.txt $U/api/mailles | jq length)" = 7
           test "$(curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/mailles | jq length)" = 7
