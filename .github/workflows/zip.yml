@@ -35,35 +35,76 @@ jobs:
       - name: Vérification de l'API
         run: |
           cd paquet
+          # Configuration de test : les mails sont déposés en fichiers .eml au lieu d'être envoyés.
+          mkdir -p App_Data
+          cat > App_Data/smtp.json <<'JSON'
+          { "Smtp": { "DossierTest": "App_Data/mails", "Expediteur": "test@exemple.fr" },
+            "Authentification": { "AdministrateurInitial": "Admin@Test.local" } }
+          JSON
           ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet SuiviMailles.dll &
           PID=$!
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5080/api/mailles >/dev/null && break; sleep 1; done
+          for i in $(seq 1 30); do curl -s http://127.0.0.1:5080/api/version >/dev/null && break; sleep 1; done
+          U=http://127.0.0.1:5080
+          # Connexion : demande d'un code, lecture du mail déposé, puis connexion avec ce code (cookie dans $2).
+          connexion() {
+            rm -rf App_Data/mails
+            curl -sf -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\"}" $U/api/auth/code | jq -e '.expiration' >/dev/null
+            CODE=$(python3 -c "import email,glob,re; m=email.message_from_file(open(glob.glob('App_Data/mails/*.eml')[0])); t=''.join(p.get_payload(decode=True).decode() for p in m.walk() if p.get_content_type()=='text/plain'); print(re.search(r'Suivi des mailles : (\S{10})', t).group(1))")
+            test ${#CODE} = 10
+            curl -sf -c "$2" -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\",\"code\":\"$CODE\"}" $U/api/auth/connexion
+          }
           set -x
-          curl -sf http://127.0.0.1:5080/ | grep -q "Suivi des mailles"
-          test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
-          curl -sf -X POST -H "Content-Type: application/json" -d '{"statut":"legitime"}' http://127.0.0.1:5080/api/mailles/0001/statut | jq -e '.statut == "legitime"'
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"statut":"autre"}' http://127.0.0.1:5080/api/mailles/0001/statut)" = 400
-          curl -sf -X POST -H "Content-Type: application/json" \
+          curl -sf $U/ | grep -q "Suivi des mailles"
+          curl -sf $U/api/version | jq -e '.version | test("^[0-9]{4}-")'
+          # Sans session : refus.
+          test "$(curl -s -o /dev/null -w '%{http_code}' $U/api/mailles)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"inconnu@test.local"}' $U/api/auth/code)" = 404
+          # Connexion de l'administrateur initial ; mauvais code refusé, code valable jusqu'à 23:59:59.
+          connexion admin@test.local /tmp/admin.txt | jq -e '.profil == "Admin"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local","code":"mauvais"}' $U/api/auth/connexion)" = 400
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local"}' $U/api/auth/code)" = 429
+          jq -e '."admin@test.local".expiration | test("T23:59:59")' App_Data/codes.json
+          if grep -qF -- "$CODE" App_Data/codes.json; then echo "code en clair dans codes.json"; exit 1; fi
+          curl -sf -b /tmp/admin.txt $U/api/auth/moi | jq -e '.email == "admin@test.local"'
+          test "$(curl -sf -b /tmp/admin.txt $U/api/mailles | jq length)" = 7
+          test "$(curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/mailles | jq length)" = 7
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"statut":"legitime"}' http://127.0.0.1:5080/api/mailles/0001/statut | jq -e '.statut == "legitime"'
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"statut":"autre"}' http://127.0.0.1:5080/api/mailles/0001/statut)" = 400
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" \
             -d '{"lignes":[{"numero":2,"siren":"055804124","maille":"055804124_FILM"},{"numero":3,"siren":"123456789","maille":"123456789_TEST"},{"numero":4,"siren":"12","maille":""},{"numero":5,"siren":"123456789","maille":" 055804124_film "}]}' \
             http://127.0.0.1:5080/api/mailles/import | jq -e '(.ajoutees | length) == 1 and .dejaPresentes == 2 and (.nonImportees | length) == 2 and (.rejets | length) == 1'
-          test "$(curl -sf http://127.0.0.1:5080/api/siren.csv | wc -l)" = 3
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:5080/api/mailles/0008/supprimer)" = 204
-          test "$(curl -sf http://127.0.0.1:5080/api/mailles | jq length)" = 7
+          test "$(curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | wc -l)" = 3
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:5080/api/mailles/0008/supprimer)" = 204
+          test "$(curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/mailles | jq length)" = 7
           jq -e '.[0].statut == "legitime"' App_Data/mailles.json
           # Sociétés : renommage, import, report sur les mailles.
-          curl -sf -X POST -H "Content-Type: application/json" -d '{"siren":"055804124","nom":"Arval"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 4'
-          curl -sf -X POST -H "Content-Type: application/json" \
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"siren":"055804124","nom":"Arval"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 4'
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" \
             -d '{"lignes":[{"numero":2,"siren":"055804124","nom":"Arval Service Lease"},{"numero":3,"siren":"987654321","nom":"Nouvelle"},{"numero":4,"siren":"","nom":"X"}]}' \
             http://127.0.0.1:5080/api/societes/import | jq -e '.ajoutees == 1 and .modifiees == 1 and (.rejets | length) == 1'
-          curl -sf http://127.0.0.1:5080/api/mailles | jq -e '[.[] | select(.siren == "055804124") | .societe] | all(. == "Arval Service Lease")'
-          test "$(curl -sf http://127.0.0.1:5080/api/societes | jq length)" = 3
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"12","nom":"x"}' http://127.0.0.1:5080/api/societes)" = 400
+          curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/mailles | jq -e '[.[] | select(.siren == "055804124") | .societe] | all(. == "Arval Service Lease")'
+          test "$(curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/societes | jq length)" = 3
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"12","nom":"x"}' http://127.0.0.1:5080/api/societes)" = 400
           jq -e 'length == 2' App_Data/societes.json
-          curl -sf http://127.0.0.1:5080/api/siren.csv | grep -q 987654321
-          curl -sf -X POST -H "Content-Type: application/json" -d '{"siren":"111222333","nom":"Sans maille"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 0'
-          curl -sf http://127.0.0.1:5080/api/siren.csv | grep -q 111222333
-          curl -sI http://127.0.0.1:5080/api/siren.csv | grep -qi "cache-control: no-store"
-          curl -sf http://127.0.0.1:5080/api/version | jq -e '.version | test("^[0-9]{4}-")'
+          curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | grep -q 987654321
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"siren":"111222333","nom":"Sans maille"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 0'
+          curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | grep -q 111222333
+          curl -sI -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | grep -qi "cache-control: no-store"
+          # Utilisateurs : création d'un profil User, accès refusé à la gestion des utilisateurs.
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"email":"agent@test.local","nom":"Agent","profil":"User"}' $U/api/utilisateurs | jq -e '.profil == "User"'
+          connexion agent@test.local /tmp/agent.txt | jq -e '.profil == "User"'
+          test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 200
+          test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/utilisateurs)" = 403
+          jq -e '.[] | select(.id == "0001") | .modifiePar == "admin@test.local"' App_Data/mailles.json
+          # Garde-fous : pas d'auto-suppression ni de perte du dernier administrateur.
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local"}' $U/api/utilisateurs/supprimer)" = 400
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local","profil":"User"}' $U/api/utilisateurs)" = 400
+          # Suppression d'un utilisateur : sa session est coupée immédiatement.
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"agent@test.local"}' $U/api/utilisateurs/supprimer)" = 204
+          test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 401
+          test "$(curl -sf -b /tmp/admin.txt $U/api/utilisateurs | jq length)" = 1
+          curl -sf -b /tmp/admin.txt -c /tmp/admin.txt -X POST $U/api/auth/deconnexion
+          test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 401
           kill $PID
           # Le zip ne doit contenir aucune donnée de test.
           rm -rf App_Data logs

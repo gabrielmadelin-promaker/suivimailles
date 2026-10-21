@@ -19,12 +19,16 @@
   Dossier physique du site. Par défaut C:\inetpub\SuiviMailles.
 .PARAMETER NomSite
   Nom du site et du pool d'applications IIS. Par défaut SuiviMailles.
+.PARAMETER Administrateur
+  Adresse mail du premier administrateur (première installation) : seule adresse autorisée à se connecter
+  tant qu'aucun autre utilisateur n'est déclaré.
 #>
 #Requires -RunAsAdministrator
 param(
     [int]$Port = 8082,
     [string]$Dossier = "C:\inetpub\SuiviMailles",
-    [string]$NomSite = "SuiviMailles"
+    [string]$NomSite = "SuiviMailles",
+    [string]$Administrateur = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,7 +55,7 @@ if ($miseAJour) {
     Start-Sleep -Seconds 3
 }
 
-robocopy $source $Dossier /E /NFL /NDL /NJH /NJS /NP /XD App_Data logs /XF Installer-SuiviMailles.ps1 LISEZMOI.txt appsettings.json app_offline.htm | Out-Null
+robocopy $source $Dossier /E /NFL /NDL /NJH /NJS /NP /R:3 /W:5 /XD App_Data logs /XF Installer-SuiviMailles.ps1 LISEZMOI.txt appsettings.json app_offline.htm | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "La copie des fichiers a échoué (robocopy code $LASTEXITCODE)." }
 if (-not (Test-Path (Join-Path $Dossier "appsettings.json"))) {
     Copy-Item (Join-Path $source "appsettings.json") $Dossier
@@ -76,6 +80,16 @@ $donnees = Join-Path $Dossier "App_Data"
 New-Item -ItemType Directory -Force -Path $donnees | Out-Null
 icacls $donnees /grant "IIS AppPool\$($NomSite):(OI)(CI)M" /Q | Out-Null
 
+# 4 bis. Configuration de l'envoi des codes d'accès (créée une seule fois, jamais écrasée).
+$smtp = Join-Path $donnees "smtp.json"
+$smtpACompleter = $false
+if (-not (Test-Path $smtp)) {
+    $config = Get-Content (Join-Path $source "smtp.modele.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($Administrateur) { $config.Authentification.AdministrateurInitial = $Administrateur }
+    $config | ConvertTo-Json -Depth 5 | Set-Content -Path $smtp -Encoding UTF8
+    $smtpACompleter = $true
+}
+
 # 5. Redémarrage.
 if (Test-Path $horsLigne) { Remove-Item $horsLigne }
 Restart-WebAppPool -Name $NomSite -ErrorAction SilentlyContinue
@@ -86,3 +100,11 @@ Write-Host ""
 Write-Host ($(if ($miseAJour) { "Mise à jour terminée." } else { "Installation terminée." })) -ForegroundColor Green
 Write-Host "Ouvrir http://localhost:$portSite/"
 Write-Host "Données : $donnees\mailles.json"
+if ($smtpACompleter) {
+    Write-Host ""
+    Write-Host "A FAIRE : renseigner le serveur SMTP dans $smtp" -ForegroundColor Yellow
+    Write-Host "  (Serveur, Port, Ssl, Utilisateur, MotDePasse, Expediteur), puis lancer : Restart-WebAppPool $NomSite"
+    if (-not $Administrateur) {
+        Write-Host "  et l'adresse du premier administrateur (Authentification > AdministrateurInitial)."
+    }
+}

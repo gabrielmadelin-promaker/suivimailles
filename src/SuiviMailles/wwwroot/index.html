@@ -10,21 +10,53 @@
 </head>
 <body>
 <!-- CORPS:DEBUT -->
-<div class="page">
+<div id="ecran-connexion" class="connexion" hidden>
+  <div class="connexion-carte">
+    <h1>Suivi des mailles</h1>
+    <p class="sub">Connexion par code d'accès envoyé par mail.</p>
+    <div id="etape-email">
+      <form id="form-email" class="connexion-form" novalidate>
+        <label for="connexion-email">Adresse mail</label>
+        <input id="connexion-email" class="filtre" type="email" autocomplete="email" placeholder="prenom.nom@exemple.fr" required>
+        <button id="bouton-code" class="btn principal" type="submit">Recevoir un code</button>
+      </form>
+    </div>
+    <div id="etape-code" hidden>
+      <form id="form-code" class="connexion-form" novalidate>
+        <label for="connexion-code">Code reçu à l'adresse <b id="code-destinataire"></b></label>
+        <input id="connexion-code" class="filtre code" type="text" autocomplete="one-time-code" maxlength="20" spellcheck="false" autocapitalize="off" placeholder="10 caractères" required>
+        <p id="code-demo" class="code-demo" hidden></p>
+        <button id="bouton-connexion" class="btn principal" type="submit">Se connecter</button>
+      </form>
+      <div class="connexion-liens">
+        <button id="renvoyer-code" class="lien" type="button">Recevoir un nouveau code</button>
+        <button id="changer-email" class="lien" type="button">Changer d'adresse</button>
+      </div>
+    </div>
+    <p id="connexion-message" class="connexion-message" role="status" hidden></p>
+  </div>
+</div>
+
+<div id="application" class="page" hidden>
   <header class="top">
     <div>
       <h1>Suivi des mailles</h1>
       <p class="sub">Qualification des mailles par société : chaque maille part en « Nouveau » et doit être déclarée légitime ou non.</p>
     </div>
-    <span id="demo" class="demo-badge" hidden>Données de démonstration, enregistrées dans ce navigateur
-      <button id="reinit" class="btn" type="button">Réinitialiser</button>
-    </span>
+    <div class="session">
+      <span id="demo" class="demo-badge" hidden>Démonstration
+        <button id="reinit" class="btn" type="button">Réinitialiser</button>
+      </span>
+      <span class="session-utilisateur"><span id="session-email"></span> <span id="session-profil" class="profil"></span></span>
+      <button id="deconnexion" class="btn" type="button">Se déconnecter</button>
+    </div>
   </header>
 
   <nav class="onglets" role="tablist" aria-label="Sections">
     <button type="button" class="onglet" role="tab" data-onglet="mailles" aria-controls="panneau-mailles" aria-selected="true">Mailles</button>
     <button type="button" class="onglet" role="tab" data-onglet="societes" aria-controls="panneau-societes" aria-selected="false">Sociétés</button>
     <button type="button" class="onglet" role="tab" data-onglet="import" aria-controls="panneau-import" aria-selected="false">Import / export</button>
+    <button type="button" class="onglet" role="tab" data-onglet="utilisateurs" aria-controls="panneau-utilisateurs" aria-selected="false" hidden>Utilisateurs</button>
   </nav>
 
   <div id="panneau-mailles" role="tabpanel" class="panneau">
@@ -176,6 +208,39 @@
         <div id="resultat-ajoutees" class="table-wrap"></div>
         <div id="resultat-rejets"></div>
       </div>
+    </section>
+  </div>
+  <div id="panneau-utilisateurs" role="tabpanel" class="panneau" hidden>
+    <section class="liste" aria-label="Utilisateurs autorisés">
+      <div class="liste-tete">
+        <span id="compte-utilisateurs" class="affiches">Chargement…</span>
+        <span class="sub">Seules les adresses déclarées ici peuvent recevoir un code d'accès.</span>
+      </div>
+      <form id="form-utilisateur" class="ajout-utilisateur" novalidate>
+        <input id="ajout-email" class="filtre" type="email" placeholder="Adresse mail" aria-label="Adresse mail du nouvel utilisateur" autocomplete="off">
+        <input id="ajout-nom-utilisateur" class="filtre" type="text" placeholder="Nom (facultatif)" aria-label="Nom du nouvel utilisateur" autocomplete="off">
+        <select id="ajout-profil" class="filtre" aria-label="Profil du nouvel utilisateur">
+          <option value="User">User</option>
+          <option value="Admin">Admin</option>
+        </select>
+        <button class="btn principal" type="submit">Ajouter</button>
+      </form>
+      <div class="table-wrap">
+        <table class="table-utilisateurs">
+          <thead><tr><th scope="col">Adresse mail</th><th scope="col">Nom</th><th scope="col" class="col-profil">Profil</th><th scope="col">Dernière connexion</th><th scope="col" class="col-actions"><span class="visuellement-cache">Actions</span></th></tr></thead>
+          <tbody id="lignes-utilisateurs"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="carte">
+      <div class="carte-tete">
+        <h2>Profils</h2>
+      </div>
+      <ul class="profils">
+        <li><b>Admin</b> : tous les onglets, dont la gestion des utilisateurs.</li>
+        <li><b>User</b> : tous les onglets sauf Utilisateurs.</li>
+      </ul>
+      <p class="sub">Un changement de profil ou une suppression s'applique immédiatement, y compris à une session déjà ouverte.</p>
     </section>
   </div>
 </div>

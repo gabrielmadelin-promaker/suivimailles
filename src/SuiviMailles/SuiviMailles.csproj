@@ -11,6 +11,8 @@
     <!-- Jeu de données initial : copié vers le fichier de stockage uniquement s'il n'existe pas encore.
          Le fichier de stockage lui-même n'est jamais publié, un redéploiement ne peut donc pas écraser les statuts saisis. -->
     <None Update="Data\mailles.seed.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Modèle de configuration SMTP : copié par le script d'installation vers App_Data\smtp.json s'il n'existe pas. -->
+    <Content Update="smtp.modele.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

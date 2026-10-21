@@ -1,7 +1,37 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using SuiviMailles;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Dossier de données (App_Data par défaut) : il contient aussi smtp.json, la configuration de l'envoi des codes.
+var dossierDonnees = Path.GetDirectoryName(Path.GetFullPath(
+    builder.Configuration["Stockage:Fichier"] ?? "App_Data/mailles.json", builder.Environment.ContentRootPath))!;
+Directory.CreateDirectory(dossierDonnees);
+builder.Configuration.AddJsonFile(Path.Combine(dossierDonnees, "smtp.json"), optional: true, reloadOnChange: true);
+
 builder.Services.AddSingleton<MailleStore>();
+builder.Services.AddSingleton<UtilisateurStore>();
+builder.Services.AddSingleton<EnvoiCode>();
+
+// Clés de chiffrement des cookies de session conservées sur disque : un recyclage du pool IIS ne déconnecte personne.
+var protection = builder.Services.AddDataProtection().SetApplicationName("SuiviMailles")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dossierDonnees, "cles")));
+// DPAPI au niveau machine : le compte du pool IIS n'a pas toujours de profil utilisateur chargé.
+if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
+{
+    o.Cookie.Name = "SuiviMailles";
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Strict;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    o.SlidingExpiration = false;
+    o.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+    o.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+});
 
 var app = builder.Build();
 
@@ -19,10 +49,118 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+app.UseAuthentication();
+
+// Contrôle d'accès de l'API : toute route exige un utilisateur connecté et toujours déclaré (son profil est relu à chaque
+// requête, un changement de profil ou une suppression s'applique donc immédiatement), sauf la connexion et la version.
+// La gestion des utilisateurs est réservée au profil Admin.
+app.Use(async (ctx, next) =>
+{
+    var chemin = ctx.Request.Path;
+    if (!chemin.StartsWithSegments("/api") || chemin.StartsWithSegments("/api/auth") || chemin.StartsWithSegments("/api/version"))
+    {
+        await next();
+        return;
+    }
+    var utilisateur = ctx.User.Identity?.IsAuthenticated == true
+        ? await ctx.RequestServices.GetRequiredService<UtilisateurStore>().TrouverAsync(ctx.User.Identity.Name)
+        : null;
+    if (utilisateur is null)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return;
+    }
+    if (chemin.StartsWithSegments("/api/utilisateurs") && utilisateur.Profil != Profils.Admin)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+    await next();
+});
+
 var version = typeof(Program).Assembly
     .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
     .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "dev";
 app.MapGet("/api/version", () => Results.Ok(new { version }));
+
+// ---- Connexion par code envoyé par mail ----
+var auth = app.MapGroup("/api/auth");
+
+auth.MapGet("/moi", async (HttpContext http, UtilisateurStore utilisateurs) =>
+    http.User.Identity?.IsAuthenticated == true && await utilisateurs.TrouverAsync(http.User.Identity.Name) is { } u
+        ? Results.Ok(new { u.Email, u.Nom, u.Profil })
+        : Results.Unauthorized());
+
+auth.MapPost("/code", async (DemandeCode demande, UtilisateurStore utilisateurs, EnvoiCode envoi) =>
+{
+    var email = UtilisateurStore.Normaliser(demande.Email);
+    if (!UtilisateurStore.EmailValide(email))
+        return Results.BadRequest(new { erreur = "Adresse mail invalide." });
+    if (!envoi.EstConfigure)
+        return Results.Json(new { erreur = "L'envoi des codes n'est pas configuré sur le serveur (fichier smtp.json). Contactez l'administrateur." },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    var (resultat, code, expiration) = await utilisateurs.CreerCodeAsync(email);
+    switch (resultat)
+    {
+        case ResultatDemande.Inconnu:
+            return Results.Json(new { erreur = "Cette adresse n'est pas déclarée dans l'application. Contactez un administrateur." },
+                statusCode: StatusCodes.Status404NotFound);
+        case ResultatDemande.TropRapproche:
+            return Results.Json(new { erreur = "Un code vient d'être envoyé. Patientez une minute avant d'en demander un autre." },
+                statusCode: StatusCodes.Status429TooManyRequests);
+    }
+    try
+    {
+        await envoi.EnvoyerAsync(email, code!, expiration);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Échec de l'envoi du code à {Email}", email);
+        await utilisateurs.AnnulerCodeAsync(email);
+        return Results.Json(new { erreur = "Le mail n'a pas pu être envoyé. Réessayez plus tard ou contactez l'administrateur." },
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+    return Results.Ok(new { expiration });
+});
+
+auth.MapPost("/connexion", async (DemandeConnexion demande, UtilisateurStore utilisateurs, HttpContext http) =>
+{
+    var (u, erreur) = await utilisateurs.VerifierAsync(demande.Email, demande.Code);
+    if (u is null) return Results.BadRequest(new { erreur });
+
+    // Session valable, comme le code, jusqu'à 23:59:59 le jour même.
+    var identite = new ClaimsIdentity([new Claim(ClaimTypes.Name, u.Email)], CookieAuthenticationDefaults.AuthenticationScheme);
+    await http.SignInAsync(new ClaimsPrincipal(identite), new AuthenticationProperties
+    {
+        IsPersistent = true,
+        AllowRefresh = false,
+        ExpiresUtc = new DateTimeOffset(DateTime.Today.AddDays(1)).ToUniversalTime(),
+    });
+    return Results.Ok(new { u.Email, u.Nom, u.Profil });
+});
+
+auth.MapPost("/deconnexion", async (HttpContext http) =>
+{
+    await http.SignOutAsync();
+    return Results.NoContent();
+});
+
+// ---- Gestion des utilisateurs (profil Admin, contrôlé plus haut) ----
+var gestion = app.MapGroup("/api/utilisateurs");
+
+gestion.MapGet("/", async (UtilisateurStore utilisateurs) => Results.Ok(await utilisateurs.ListerAsync()));
+
+gestion.MapPost("/", async (UtilisateurSaisi saisie, UtilisateurStore utilisateurs, HttpContext http) =>
+{
+    var (u, erreur) = await utilisateurs.EnregistrerAsync(saisie, http.User.Identity!.Name!);
+    return u is null ? Results.BadRequest(new { erreur }) : Results.Ok(u);
+});
+
+gestion.MapPost("/supprimer", async (DemandeCode cible, UtilisateurStore utilisateurs, HttpContext http) =>
+    await utilisateurs.SupprimerAsync(cible.Email, http.User.Identity!.Name!) is { } erreur
+        ? Results.BadRequest(new { erreur })
+        : Results.NoContent());
 
 var api = app.MapGroup("/api/mailles");
 
@@ -34,8 +172,8 @@ api.MapPost("/{id}/statut", async (string id, ChangementStatut corps, MailleStor
     if (!Statuts.Tous.Contains(corps.Statut))
         return Results.BadRequest(new { erreur = $"Statut inconnu : {corps.Statut}" });
 
-    // Renseigné si l'authentification Windows est activée sur le site IIS.
-    var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+    // Adresse mail de l'utilisateur connecté.
+    var utilisateur = http.User.Identity?.Name;
 
     var maille = await store.ChangerStatutAsync(id, corps.Statut, utilisateur);
     return maille is null ? Results.NotFound() : Results.Ok(maille);
@@ -43,7 +181,7 @@ api.MapPost("/{id}/statut", async (string id, ChangementStatut corps, MailleStor
 
 api.MapPost("/{id}/supprimer", async (string id, MailleStore store, HttpContext http) =>
 {
-    var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+    var utilisateur = http.User.Identity?.Name;
     return await store.SupprimerAsync(id, utilisateur) is null ? Results.NotFound() : Results.NoContent();
 });
 
@@ -62,7 +200,7 @@ api.MapPost("/import", async (DemandeImport demande, MailleStore store, HttpCont
     if (demande.Lignes is null || demande.Lignes.Count == 0)
         return Results.BadRequest(new { erreur = "Aucune ligne à importer." });
 
-    var utilisateur = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+    var utilisateur = http.User.Identity?.Name;
     return Results.Ok(await store.ImporterAsync(demande.Lignes, utilisateur));
 });
 

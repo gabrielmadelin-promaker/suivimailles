@@ -19,7 +19,34 @@ Installation ou mise à jour
      powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1
 4. Ouvrir http://localhost:8082/
 
-Options : -Port 8090  -Dossier D:\Sites\SuiviMailles  -NomSite SuiviMailles
+   Première installation (ou première version avec connexion par code) : ajouter
+   l'adresse du premier administrateur :
+     powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1 -Administrateur prenom.nom@domaine.fr
+
+Options : -Port 8090  -Dossier D:\Sites\SuiviMailles  -NomSite SuiviMailles  -Administrateur adresse
+
+Connexion par code (MFA)
+------------------------
+L'accès se fait avec l'adresse mail : si elle est déclarée dans l'onglet Utilisateurs,
+un code de 10 caractères est envoyé par mail. Il est valable jusqu'à 23h59 le jour même
+(5 essais au plus ; un nouveau code remplace le précédent).
+
+Configuration : App_Data\smtp.json (créé par le script d'installation, jamais écrasé)
+  "Smtp": {
+    "Serveur": "smtp.domaine.fr",   serveur SMTP
+    "Port": 587,                    587 (STARTTLS) ou 25 ; le port 465 (SSL implicite) n'est pas pris en charge
+    "Ssl": true,                    true pour STARTTLS
+    "Utilisateur": "", "MotDePasse": "",   vides si le relais n'exige pas d'authentification
+    "Expediteur": "suivi-mailles@domaine.fr",
+    "NomExpediteur": "Suivi des mailles",
+    "DossierTest": ""               si renseigné (ex. C:\Temp\mails), les mails sont déposés en .eml
+                                    dans ce dossier au lieu d'être envoyés (tests)
+  },
+  "Authentification": { "AdministrateurInitial": "prenom.nom@domaine.fr" }
+
+Après modification de smtp.json : Restart-WebAppPool SuiviMailles
+L'administrateur initial n'est créé que si aucun administrateur n'existe encore ; les autres
+utilisateurs se déclarent ensuite dans l'onglet Utilisateurs.
 
 Une mise à jour se fait de la même façon avec le nouveau zip : les données
 (App_Data\mailles.json) et appsettings.json ne sont jamais écrasés.
@@ -36,6 +63,8 @@ Installation manuelle (sans le script)
 Données
 -------
 - Au premier démarrage, App_Data\mailles.json est créé avec les 7 mailles de départ.
+- Utilisateurs : App_Data\utilisateurs.json ; codes du jour (empreintes) : App_Data\codes.json ;
+  clés de session : App_Data\cles\.
 - Sauvegarde : copier App_Data\mailles.json.
 
 En cas de problème
@@ -44,3 +73,6 @@ En cas de problème
 - Erreur 500.30 : passer stdoutLogEnabled="true" dans web.config, recharger la page,
   lire le fichier dans le dossier logs\ puis remettre "false".
 - Les statuts ne s'enregistrent pas : vérifier le droit « Modifier » du pool sur App_Data.
+- « L'envoi des codes n'est pas configuré » : compléter App_Data\smtp.json puis redémarrer le pool.
+- « Le mail n'a pas pu être envoyé » : vérifier serveur, port et identifiants SMTP ; le détail de
+  l'erreur est dans le journal (stdoutLogEnabled="true" dans web.config).

@@ -11,15 +11,62 @@
   // --- Accès aux données -------------------------------------------------
   // En production (IIS) : API du serveur applicatif. Chemin relatif pour fonctionner aussi
   // dans une sous-application IIS (ex. https://serveur/suivimailles/).
+  // Une réponse 401 (session expirée à minuit, utilisateur supprimé) ramène à l'écran de connexion.
+  async function appel(url, options) {
+    const r = await fetch(url, options);
+    if (r.status === 401) {
+      afficherConnexion("Votre session a expiré. Reconnectez-vous.");
+      throw new Error("Session expirée");
+    }
+    return r;
+  }
+  const lireErreur = async (r, defaut) => {
+    try { return (await r.json()).erreur || defaut; } catch { return defaut; }
+  };
+  const postJson = (url, corps) => fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps),
+  });
+
   const apiStore = {
     demo: false,
+    // Connexion
+    async moi() {
+      const r = await fetch("api/auth/moi", { headers: { Accept: "application/json" } });
+      return r.ok ? r.json() : null;
+    },
+    async demanderCode(email) {
+      const r = await postJson("api/auth/code", { email });
+      if (!r.ok) throw new Error(await lireErreur(r, `Demande refusée (HTTP ${r.status})`));
+      return r.json();
+    },
+    async seConnecter(email, code) {
+      const r = await postJson("api/auth/connexion", { email, code });
+      if (!r.ok) throw new Error(await lireErreur(r, `Connexion refusée (HTTP ${r.status})`));
+      return r.json();
+    },
+    async seDeconnecter() { await fetch("api/auth/deconnexion", { method: "POST" }); },
+    // Utilisateurs (profil Admin)
+    async listerUtilisateurs() {
+      const r = await appel("api/utilisateurs", { headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error(`Chargement des utilisateurs impossible (HTTP ${r.status})`);
+      return r.json();
+    },
+    async enregistrerUtilisateur(u) {
+      const r = await appel("api/utilisateurs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(u) });
+      if (!r.ok) throw new Error(await lireErreur(r, `Enregistrement refusé (HTTP ${r.status})`));
+      return r.json();
+    },
+    async supprimerUtilisateur(email) {
+      const r = await appel("api/utilisateurs/supprimer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      if (!r.ok) throw new Error(await lireErreur(r, `Suppression refusée (HTTP ${r.status})`));
+    },
     async lister() {
-      const r = await fetch("api/mailles", { headers: { Accept: "application/json" } });
+      const r = await appel("api/mailles", { headers: { Accept: "application/json" } });
       if (!r.ok) throw new Error(`Chargement impossible (HTTP ${r.status})`);
       return r.json();
     },
     async changerStatut(id, statut) {
-      const r = await fetch(`api/mailles/${encodeURIComponent(id)}/statut`, {
+      const r = await appel(`api/mailles/${encodeURIComponent(id)}/statut`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ statut }),
@@ -28,17 +75,17 @@
       return r.json();
     },
     async supprimer(id) {
-      const r = await fetch(`api/mailles/${encodeURIComponent(id)}/supprimer`, { method: "POST" });
+      const r = await appel(`api/mailles/${encodeURIComponent(id)}/supprimer`, { method: "POST" });
       // 404 : déjà supprimée par quelqu'un d'autre, le résultat attendu est atteint.
       if (!r.ok && r.status !== 404) throw new Error(`Suppression refusée par le serveur (HTTP ${r.status})`);
     },
     async listerSocietes() {
-      const r = await fetch("api/societes", { headers: { Accept: "application/json" } });
+      const r = await appel("api/societes", { headers: { Accept: "application/json" } });
       if (!r.ok) throw new Error(`Chargement des sociétés impossible (HTTP ${r.status})`);
       return r.json();
     },
     async definirSociete(siren, nom) {
-      const r = await fetch("api/societes", {
+      const r = await appel("api/societes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ siren, nom }),
@@ -47,7 +94,7 @@
       return r.json();
     },
     async importerSocietes(lignes) {
-      const r = await fetch("api/societes/import", {
+      const r = await appel("api/societes/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lignes }),
@@ -56,7 +103,7 @@
       return r.json();
     },
     async importer(lignes) {
-      const r = await fetch("api/mailles/import", {
+      const r = await appel("api/mailles/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lignes }),
@@ -69,6 +116,22 @@
   // En démonstration (artefact de test) : données embarquées, modifications gardées dans ce navigateur.
   const CLE = "suivimailles-demo-v3";
   const CLE_SOCIETES = "suivimailles-demo-societes-v1";
+  const CLE_UTILISATEURS = "suivimailles-demo-utilisateurs-v1";
+  const CLE_SESSION = "suivimailles-demo-session-v1";
+  const lireLocal = (cle, defaut) => { try { return JSON.parse(localStorage.getItem(cle) || "null") ?? defaut; } catch { return defaut; } };
+  const ecrireLocal = (cle, val) => { try { localStorage.setItem(cle, JSON.stringify(val)); } catch { /* valable jusqu'au rechargement */ } };
+  const utilisateursDemo = () => lireLocal(CLE_UTILISATEURS, [
+    { email: "admin@exemple.fr", nom: "Administrateur", profil: "Admin", derniereConnexion: null },
+    { email: "utilisateur@exemple.fr", nom: "Utilisateur", profil: "User", derniereConnexion: null },
+  ]);
+  const genererCode = () => {
+    const maj = "ABCDEFGHJKLMNPQRSTUVWXYZ", min = "abcdefghijkmnopqrstuvwxyz", chi = "23456789", spe = "!#$%&*+-=?@", tous = maj + min + chi + spe;
+    const tirer = t => t[crypto.getRandomValues(new Uint32Array(1))[0] % t.length];
+    const c = [tirer(maj), tirer(min), tirer(chi), tirer(spe)];
+    while (c.length < 10) c.push(tirer(tous));
+    return c.sort(() => crypto.getRandomValues(new Uint8Array(1))[0] - 128).join("");
+  };
+  const finDeJournee = () => { const d = new Date(); d.setHours(23, 59, 59, 0); return d.toISOString(); };
   const demoStore = {
     demo: true,
     _donnees: [],
@@ -88,6 +151,60 @@
       this._donnees = Array.isArray(sauvees) ? sauvees : structuredClone(window.SUIVI_DEMO_DATA || []);
       this._societes = societes && typeof societes === "object" ? societes : {};
       return structuredClone(this._donnees);
+    },
+    // Connexion simulée : le code est affiché à l'écran au lieu d'être envoyé par mail.
+    _code: null,
+    async moi() {
+      const s = lireLocal(CLE_SESSION, null);
+      if (!s || new Date(s.expiration) < new Date()) return null;
+      return utilisateursDemo().find(u => u.email === s.email) ?? null;
+    },
+    async demanderCode(email) {
+      email = email.trim().toLowerCase();
+      if (!utilisateursDemo().some(u => u.email === email))
+        throw new Error("Cette adresse n'est pas déclarée dans l'application. Contactez un administrateur.");
+      this._code = { email, code: genererCode(), expiration: finDeJournee(), echecs: 0 };
+      return { expiration: this._code.expiration, codeDemo: this._code.code };
+    },
+    async seConnecter(email, code) {
+      email = email.trim().toLowerCase();
+      const c = this._code;
+      if (!c || c.email !== email) throw new Error("Aucun code valide pour cette adresse. Demandez un nouveau code.");
+      if (c.code !== code.trim()) {
+        c.echecs++;
+        const restantes = 5 - c.echecs;
+        if (restantes <= 0) this._code = null;
+        throw new Error(restantes > 0 ? `Code incorrect. Il reste ${restantes} essai${restantes > 1 ? "s" : ""}.` : "Code incorrect. Trop d'essais : demandez un nouveau code.");
+      }
+      const liste = utilisateursDemo();
+      const u = liste.find(x => x.email === email);
+      u.derniereConnexion = new Date().toISOString();
+      ecrireLocal(CLE_UTILISATEURS, liste);
+      ecrireLocal(CLE_SESSION, { email, expiration: c.expiration });
+      return u;
+    },
+    async seDeconnecter() { try { localStorage.removeItem(CLE_SESSION); } catch { /* rien */ } },
+    async listerUtilisateurs() { return utilisateursDemo().sort((a, b) => a.email.localeCompare(b.email)); },
+    async enregistrerUtilisateur({ email, nom, profil }) {
+      email = email.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error(`Adresse mail invalide : ${email}`);
+      const liste = utilisateursDemo();
+      let u = liste.find(x => x.email === email);
+      if (u?.profil === "Admin" && profil !== "Admin") {
+        if (email === etat.moi?.email) throw new Error("Vous ne pouvez pas retirer votre propre profil Admin.");
+        if (liste.filter(x => x.profil === "Admin").length === 1) throw new Error("Il doit rester au moins un administrateur.");
+      }
+      if (!u) { u = { email, derniereConnexion: null }; liste.push(u); }
+      Object.assign(u, { nom: (nom || "").trim(), profil });
+      ecrireLocal(CLE_UTILISATEURS, liste);
+      return u;
+    },
+    async supprimerUtilisateur(email) {
+      const liste = utilisateursDemo();
+      const u = liste.find(x => x.email === email);
+      if (email === etat.moi?.email) throw new Error("Vous ne pouvez pas supprimer votre propre compte.");
+      if (u?.profil === "Admin" && liste.filter(x => x.profil === "Admin").length === 1) throw new Error("Il doit rester au moins un administrateur.");
+      ecrireLocal(CLE_UTILISATEURS, liste.filter(x => x.email !== email));
     },
     // Mêmes règles que MailleStore côté serveur (référentiel SIREN -> nom, recopié sur les mailles).
     async listerSocietes() {
@@ -159,7 +276,7 @@
       return { ajoutees, dejaPresentes: nonImportees.length, nonImportees, rejets };
     },
     reinitialiser() {
-      try { localStorage.removeItem(CLE); localStorage.removeItem(CLE_SOCIETES); } catch { /* rien à faire */ }
+      try { for (const c of [CLE, CLE_SOCIETES, CLE_UTILISATEURS]) localStorage.removeItem(c); } catch { /* rien à faire */ }
     },
   };
 
@@ -169,6 +286,7 @@
   const etat = {
     mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
     societes: [], filtresSocietes: { nom: "", siren: "" },
+    moi: null, utilisateurs: [],
   };
 
   const $ = sel => document.querySelector(sel);
@@ -302,32 +420,26 @@
     rendre();
   });
 
-  // --- Suppression avec confirmation ---------------------------------------------
-  let aSupprimer = null, focusAvant = null;
+  // --- Fenêtre de confirmation (suppressions) -------------------------------------
+  let confirmationEnCours = null, focusAvant = null;
 
-  function ouvrirConfirmation(maille) {
-    aSupprimer = maille;
+  function ouvrirConfirmation({ titre, detail, avertissement, libelle, action }) {
+    confirmationEnCours = action;
     focusAvant = document.activeElement;
-    $("#conf-detail").innerHTML = `
-      <dt>Maille</dt><dd class="maille">${esc(maille.maille)}</dd>
-      <dt>SIREN</dt><dd class="siren">${esc(formatSiren(maille.siren))}</dd>
-      <dt>Société</dt><dd>${maille.societe ? esc(maille.societe) : '<span class="inconnue">Non renseignée</span>'}</dd>
-      <dt>Statut</dt><dd><span class="pastille-statut ${esc(maille.statut)}">${libelleStatut[maille.statut]}</span></dd>`;
+    $("#conf-titre").textContent = titre;
+    $("#conf-detail").innerHTML = detail;
+    $("#conf-avert").textContent = avertissement;
+    $("#conf-supprimer").textContent = libelle;
     $("#confirmation").hidden = false;
     $("#conf-annuler").focus();
   }
 
   function fermerConfirmation() {
     $("#confirmation").hidden = true;
-    aSupprimer = null;
+    confirmationEnCours = null;
     focusAvant?.focus?.();
   }
 
-  $("#lignes").addEventListener("click", e => {
-    const btn = e.target.closest("button.supprimer");
-    if (!btn) return;
-    ouvrirConfirmation(etat.mailles.find(m => m.id === btn.closest("tr").dataset.id));
-  });
   $("#conf-annuler").addEventListener("click", fermerConfirmation);
   $("#confirmation").addEventListener("click", e => { if (e.target.id === "confirmation") fermerConfirmation(); });
   document.addEventListener("keydown", e => {
@@ -340,23 +452,45 @@
     }
   });
   $("#conf-supprimer").addEventListener("click", async () => {
-    const maille = aSupprimer;
-    if (!maille) return;
+    const action = confirmationEnCours;
+    if (!action) return;
     const btn = $("#conf-supprimer");
     btn.disabled = true;
     try {
-      await store.supprimer(maille.id);
-      etat.mailles = etat.mailles.filter(m => m.id !== maille.id);
-      fermerConfirmation();
-      rendre();
-      rendreExport();
-      toast(`Maille ${maille.maille} supprimée`);
-      rafraichirSocietes();
-    } catch (err) {
-      toast(`${err.message}. La maille n'a pas été supprimée.`);
+      if (await action() !== false) fermerConfirmation();
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // Suppression d'une maille
+  $("#lignes").addEventListener("click", e => {
+    const btn = e.target.closest("button.supprimer");
+    if (!btn) return;
+    const maille = etat.mailles.find(m => m.id === btn.closest("tr").dataset.id);
+    ouvrirConfirmation({
+      titre: "Supprimer cette maille ?",
+      detail: `
+        <dt>Maille</dt><dd class="maille">${esc(maille.maille)}</dd>
+        <dt>SIREN</dt><dd class="siren">${esc(formatSiren(maille.siren))}</dd>
+        <dt>Société</dt><dd>${maille.societe ? esc(maille.societe) : '<span class="inconnue">Non renseignée</span>'}</dd>
+        <dt>Statut</dt><dd><span class="pastille-statut ${esc(maille.statut)}">${libelleStatut[maille.statut]}</span></dd>`,
+      avertissement: "La suppression est définitive : la maille et son statut seront effacés. Si elle figure encore dans adresses_de_facturation.csv, le prochain import la recréera au statut « Nouveau ».",
+      libelle: "Supprimer définitivement",
+      action: async () => {
+        try {
+          await store.supprimer(maille.id);
+        } catch (err) {
+          toast(`${err.message}. La maille n'a pas été supprimée.`);
+          return false;
+        }
+        etat.mailles = etat.mailles.filter(m => m.id !== maille.id);
+        rendre();
+        rendreExport();
+        toast(`Maille ${maille.maille} supprimée`);
+        rafraichirSocietes();
+      },
+    });
   });
 
   if (store.demo) {
@@ -374,6 +508,7 @@
     for (const p of document.querySelectorAll("[role=tabpanel]")) p.hidden = p.id !== `panneau-${nom}`;
     if (nom === "import") rendreExport();
     if (nom === "societes") rendreSocietes();
+    if (nom === "utilisateurs") chargerUtilisateurs();
   }
   document.querySelector(".onglets").addEventListener("click", e => {
     const b = e.target.closest(".onglet");
@@ -849,6 +984,204 @@
     }
   });
 
+  // --- Utilisateurs (profil Admin) ------------------------------------------------
+  const dateHeure = iso => iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
+
+  async function chargerUtilisateurs() {
+    try {
+      etat.utilisateurs = await store.listerUtilisateurs();
+    } catch (err) {
+      $("#lignes-utilisateurs").innerHTML = `<tr><td colspan="5" class="vide">${esc(err.message)}</td></tr>`;
+      return;
+    }
+    rendreUtilisateurs();
+  }
+
+  function rendreUtilisateurs() {
+    const n = etat.utilisateurs.length, admins = etat.utilisateurs.filter(u => u.profil === "Admin").length;
+    $("#compte-utilisateurs").textContent = `${n} utilisateur${n > 1 ? "s" : ""}, dont ${admins} administrateur${admins > 1 ? "s" : ""}`;
+    $("#lignes-utilisateurs").innerHTML = etat.utilisateurs.map(u => {
+      const moi = u.email === etat.moi?.email;
+      return `
+      <tr data-email="${esc(u.email)}">
+        <td class="email">${esc(u.email)}${moi ? ' <span class="vous">vous</span>' : ""}</td>
+        <td><input class="nom-utilisateur" type="text" value="${esc(u.nom || "")}" data-initial="${esc(u.nom || "")}" placeholder="Nom" aria-label="Nom de ${esc(u.email)}" autocomplete="off"></td>
+        <td><select class="profil-utilisateur" aria-label="Profil de ${esc(u.email)}"${moi ? " disabled title=\"Vous ne pouvez pas modifier votre propre profil\"" : ""}>
+          <option value="User"${u.profil === "User" ? " selected" : ""}>User</option>
+          <option value="Admin"${u.profil === "Admin" ? " selected" : ""}>Admin</option>
+        </select></td>
+        <td class="date">${dateHeure(u.derniereConnexion) || '<span class="inconnue">Jamais</span>'}</td>
+        <td class="col-actions">${moi ? "" : `<button type="button" class="supprimer" title="Supprimer cet utilisateur" aria-label="Supprimer ${esc(u.email)}">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 1.5h4a.5.5 0 0 1 .5.5v1H14v1.5h-1l-.7 9.1a1.5 1.5 0 0 1-1.5 1.4H5.2a1.5 1.5 0 0 1-1.5-1.4L3 4.5H2V3h3.5V2a.5.5 0 0 1 .5-.5Zm-1.5 3 .7 9h5.6l.7-9h-7Zm2 1.5h1v6h-1v-6Zm2 0h1v6h-1v-6Z"/></svg></button>`}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function enregistrerUtilisateur(u, message) {
+    try {
+      const maj = await store.enregistrerUtilisateur(u);
+      const i = etat.utilisateurs.findIndex(x => x.email === maj.email);
+      if (i >= 0) etat.utilisateurs[i] = maj; else etat.utilisateurs.push(maj);
+      etat.utilisateurs.sort((a, b) => a.email.localeCompare(b.email));
+      toast(message(maj));
+      return true;
+    } catch (err) {
+      toast(`${err.message}`);
+      return false;
+    }
+  }
+
+  $("#form-utilisateur").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("#ajout-email").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("Saisissez une adresse mail valide."); $("#ajout-email").focus(); return; }
+    const existait = etat.utilisateurs.some(u => u.email === email);
+    if (await enregistrerUtilisateur({ email, nom: $("#ajout-nom-utilisateur").value, profil: $("#ajout-profil").value },
+      u => existait ? `${u.email} mis à jour (${u.profil})` : `${u.email} ajouté (${u.profil})`)) {
+      $("#form-utilisateur").reset();
+      rendreUtilisateurs();
+      $("#ajout-email").focus();
+    }
+  });
+
+  $("#lignes-utilisateurs").addEventListener("change", async e => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    const u = etat.utilisateurs.find(x => x.email === tr.dataset.email);
+    if (e.target.matches("select.profil-utilisateur")) {
+      const ok = await enregistrerUtilisateur({ email: u.email, nom: u.nom, profil: e.target.value }, x => `${x.email} : profil ${x.profil}`);
+      if (!ok) e.target.value = u.profil;
+      rendreUtilisateurs();
+    }
+    if (e.target.matches("input.nom-utilisateur")) {
+      const nom = e.target.value.trim();
+      if (nom === e.target.dataset.initial) return;
+      if (await enregistrerUtilisateur({ email: u.email, nom, profil: u.profil }, x => `${x.email} : nom enregistré`)) e.target.dataset.initial = nom;
+      else e.target.value = e.target.dataset.initial;
+    }
+  });
+  $("#lignes-utilisateurs").addEventListener("keydown", e => {
+    const champ = e.target.closest("input.nom-utilisateur");
+    if (!champ) return;
+    if (e.key === "Enter") champ.blur();
+    if (e.key === "Escape") { champ.value = champ.dataset.initial; champ.blur(); }
+  });
+  $("#lignes-utilisateurs").addEventListener("click", e => {
+    const btn = e.target.closest("button.supprimer");
+    if (!btn) return;
+    const u = etat.utilisateurs.find(x => x.email === btn.closest("tr").dataset.email);
+    ouvrirConfirmation({
+      titre: "Supprimer cet utilisateur ?",
+      detail: `<dt>Adresse</dt><dd>${esc(u.email)}</dd><dt>Nom</dt><dd>${u.nom ? esc(u.nom) : '<span class="inconnue">Non renseigné</span>'}</dd>
+        <dt>Profil</dt><dd>${esc(u.profil)}</dd>`,
+      avertissement: "Cette personne ne pourra plus se connecter : sa session en cours est coupée immédiatement. Elle pourra être déclarée de nouveau plus tard.",
+      libelle: "Supprimer l'utilisateur",
+      action: async () => {
+        try {
+          await store.supprimerUtilisateur(u.email);
+        } catch (err) {
+          toast(err.message);
+          return false;
+        }
+        etat.utilisateurs = etat.utilisateurs.filter(x => x.email !== u.email);
+        rendreUtilisateurs();
+        toast(`${u.email} supprimé`);
+      },
+    });
+  });
+
+  // --- Connexion par code envoyé par mail -------------------------------------------
+  let emailConnexion = "";
+
+  function afficherConnexion(message = "") {
+    etat.moi = null;
+    $("#application").hidden = true;
+    $("#confirmation").hidden = true;
+    $("#ecran-connexion").hidden = false;
+    $("#etape-code").hidden = true;
+    $("#etape-email").hidden = false;
+    messageConnexion(message, "info");
+    $("#connexion-email").focus();
+  }
+
+  function messageConnexion(texte, type = "erreur") {
+    const m = $("#connexion-message");
+    m.textContent = texte;
+    m.className = `connexion-message ${type}`;
+    m.hidden = !texte;
+  }
+
+  async function envoyerCode() {
+    const email = $("#connexion-email").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { messageConnexion("Saisissez une adresse mail valide."); return; }
+    const btn = $("#bouton-code");
+    btn.disabled = true;
+    messageConnexion("");
+    try {
+      const r = await store.demanderCode(email);
+      emailConnexion = email;
+      $("#code-destinataire").textContent = email;
+      $("#etape-email").hidden = true;
+      $("#etape-code").hidden = false;
+      $("#connexion-code").value = "";
+      $("#connexion-code").focus();
+      $("#code-demo").hidden = !r.codeDemo;
+      if (r.codeDemo) $("#code-demo").innerHTML = `Démonstration : le mail contiendrait le code <code>${esc(r.codeDemo)}</code>`;
+      messageConnexion(`Code envoyé. Il est valable jusqu'à 23 h 59 aujourd'hui.`, "info");
+    } catch (err) {
+      messageConnexion(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $("#form-email").addEventListener("submit", e => { e.preventDefault(); envoyerCode(); });
+  $("#renvoyer-code").addEventListener("click", async () => {
+    $("#connexion-email").value = emailConnexion;
+    $("#etape-code").hidden = true;
+    $("#etape-email").hidden = false;
+    await envoyerCode();
+  });
+  $("#changer-email").addEventListener("click", () => {
+    $("#etape-code").hidden = true;
+    $("#etape-email").hidden = false;
+    messageConnexion("");
+    $("#connexion-email").focus();
+  });
+  $("#form-code").addEventListener("submit", async e => {
+    e.preventDefault();
+    const code = $("#connexion-code").value.trim();
+    if (!code) return;
+    const btn = $("#bouton-connexion");
+    btn.disabled = true;
+    try {
+      const u = await store.seConnecter(emailConnexion, code);
+      ouvrirApplication(u);
+    } catch (err) {
+      messageConnexion(err.message);
+      $("#connexion-code").select();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $("#deconnexion").addEventListener("click", async () => {
+    await store.seDeconnecter();
+    afficherConnexion("Vous êtes déconnecté.");
+  });
+
+  function ouvrirApplication(u) {
+    etat.moi = u;
+    $("#ecran-connexion").hidden = true;
+    $("#application").hidden = false;
+    $("#session-email").textContent = u.nom ? `${u.nom} (${u.email})` : u.email;
+    $("#session-profil").textContent = u.profil;
+    const admin = u.profil === "Admin";
+    $('.onglet[data-onglet="utilisateurs"]').hidden = !admin;
+    const demande = location.hash.slice(1);
+    afficherOnglet(["societes", "import"].includes(demande) || (admin && demande === "utilisateurs") ? demande : "mailles");
+    charger();
+  }
+
   // --- Démarrage -------------------------------------------------------------
   async function charger() {
     try {
@@ -867,6 +1200,5 @@
       if (v?.version) { $("#version").textContent = `Version ${v.version}`; $("#version").hidden = false; }
     }).catch(() => { /* sans importance */ });
   }
-  afficherOnglet(["#societes", "#import"].includes(location.hash) ? location.hash.slice(1) : "mailles");
-  charger();
+  store.moi().then(u => u ? ouvrirApplication(u) : afficherConnexion()).catch(() => afficherConnexion());
 })();

@@ -28,6 +28,18 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
     un SIREN dont Excel a supprimé les zéros en tête est complété à 9 chiffres. La société n'étant pas dans le fichier,
     elle est reprise d'une maille existante du même SIREN, sinon laissée « Non renseignée ».
 
+## Connexion et profils
+
+- **Connexion par code (MFA)** : l'utilisateur saisit son adresse mail ; si elle est déclarée, un code de 10 caractères
+  (majuscule, minuscule, chiffre, caractère spécial) lui est envoyé par mail. Le code est valable jusqu'à 23:59:59 le jour
+  même, 5 essais au plus ; un nouveau code remplace le précédent (au plus un par minute). La session expire aussi à minuit.
+  Seule l'empreinte SHA-256 du code est conservée (`App_Data/codes.json`).
+- **Profils** : **Admin** (tous les onglets) et **User** (tous sauf Utilisateurs). Le profil est relu à chaque requête :
+  un changement ou une suppression s'applique immédiatement. Impossible de se supprimer soi-même ou de retirer le dernier Admin.
+- **SMTP** : `App_Data/smtp.json` (modèle `smtp.modele.json`, créé par le script d'installation). `DossierTest` dépose les
+  mails en `.eml` au lieu de les envoyer. `Authentification:AdministrateurInitial` crée le premier administrateur.
+- Toutes les routes `/api` exigent une session, sauf `/api/auth/*` et `/api/version` ; `/api/utilisateurs` exige Admin.
+
 ## Architecture
 
 ```
@@ -39,6 +51,10 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 
 | Appel | Rôle |
 |---|---|
+| `POST api/auth/code` — `{"email":"…"}` | Envoie un code d'accès (404 si l'adresse n'est pas déclarée) |
+| `POST api/auth/connexion` — `{"email":"…","code":"…"}` | Ouvre la session (cookie jusqu'à minuit) |
+| `GET  api/auth/moi`, `POST api/auth/deconnexion` | Session en cours, déconnexion |
+| `GET/POST api/utilisateurs`, `POST api/utilisateurs/supprimer` | Gestion des utilisateurs (Admin) |
 | `GET  api/mailles` | Liste des mailles |
 | `POST api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
 | `POST api/mailles/{id}/supprimer` | Supprime une maille |

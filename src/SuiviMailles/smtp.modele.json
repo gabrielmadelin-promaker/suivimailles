@@ -1,0 +1,15 @@
+{
+  "Smtp": {
+    "Serveur": "smtp.exemple.fr",
+    "Port": 587,
+    "Ssl": true,
+    "Utilisateur": "",
+    "MotDePasse": "",
+    "Expediteur": "suivi-mailles@exemple.fr",
+    "NomExpediteur": "Suivi des mailles",
+    "DossierTest": ""
+  },
+  "Authentification": {
+    "AdministrateurInitial": ""
+  }
+}
