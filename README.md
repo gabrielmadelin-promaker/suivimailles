@@ -83,7 +83,8 @@ Comme pour l'application Titres, l'application s'installe à partir d'un zip :
    pour une version taguée.
 2. Prérequis serveur, une seule fois : **ASP.NET Core 8 Hosting Bundle**, puis `iisreset`.
 3. Dézipper sur le serveur et lancer en administrateur :
-   `powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1`
+   `powershell -ExecutionPolicy Bypass -File .\Installer-SuiviMailles.ps1 -Administrateur prenom.nom@domaine.fr`,
+   puis compléter `App_Data\smtp.json` (serveur SMTP) et lancer `Restart-WebAppPool SuiviMailles`.
 4. Ouvrir http://localhost:8082/
 
 Le script crée le pool (Aucun code managé), le site sur le port 8082 et les droits sur `App_Data`.
