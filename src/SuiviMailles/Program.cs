@@ -117,6 +117,9 @@ auth.MapPost("/code", async (DemandeCode demande, UtilisateurStore utilisateurs,
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Échec de l'envoi du code à {Email}", email);
+        // Journal lisible sans activer les logs IIS : App_Data\journal-envoi.log
+        File.AppendAllText(Path.Combine(dossierDonnees, "journal-envoi.log"),
+            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {email}  {EnvoiCode.Detail(ex)}{Environment.NewLine}");
         await utilisateurs.AnnulerCodeAsync(email);
         return Results.Json(new { erreur = "Le mail n'a pas pu être envoyé. Réessayez plus tard ou contactez l'administrateur." },
             statusCode: StatusCodes.Status502BadGateway);
@@ -155,6 +158,24 @@ gestion.MapPost("/", async (UtilisateurSaisi saisie, UtilisateurStore utilisateu
 {
     var (u, erreur) = await utilisateurs.EnregistrerAsync(saisie, http.User.Identity!.Name!);
     return u is null ? Results.BadRequest(new { erreur }) : Results.Ok(u);
+});
+
+// Diagnostic SMTP : envoie un mail de test à l'administrateur connecté et renvoie l'erreur exacte en cas d'échec.
+gestion.MapPost("/test-mail", async (EnvoiCode envoi, HttpContext http) =>
+{
+    var destinataire = http.User.Identity!.Name!;
+    if (!envoi.EstConfigure)
+        return Results.Ok(new { ok = false, destinataire, parametres = envoi.Parametres(), detail = "Configuration incomplète : Serveur et Expediteur sont obligatoires dans smtp.json." });
+    try
+    {
+        await envoi.EnvoyerTestAsync(destinataire);
+        return Results.Ok(new { ok = true, destinataire, parametres = envoi.Parametres(), detail = (string?)null });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Échec du mail de test");
+        return Results.Ok(new { ok = false, destinataire, parametres = envoi.Parametres(), detail = EnvoiCode.Detail(ex) });
+    }
 });
 
 gestion.MapPost("/supprimer", async (DemandeCode cible, UtilisateurStore utilisateurs, HttpContext http) =>

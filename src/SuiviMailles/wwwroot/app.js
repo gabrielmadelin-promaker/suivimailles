@@ -56,6 +56,11 @@
       if (!r.ok) throw new Error(await lireErreur(r, `Enregistrement refusé (HTTP ${r.status})`));
       return r.json();
     },
+    async testerMail() {
+      const r = await appel("api/utilisateurs/test-mail", { method: "POST" });
+      if (!r.ok) throw new Error(`Test refusé (HTTP ${r.status})`);
+      return r.json();
+    },
     async supprimerUtilisateur(email) {
       const r = await appel("api/utilisateurs/supprimer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
       if (!r.ok) throw new Error(await lireErreur(r, `Suppression refusée (HTTP ${r.status})`));
@@ -198,6 +203,10 @@
       Object.assign(u, { nom: (nom || "").trim(), profil });
       ecrireLocal(CLE_UTILISATEURS, liste);
       return u;
+    },
+    async testerMail() {
+      return { ok: true, destinataire: etat.moi.email, detail: null,
+        parametres: { mode: "démonstration : aucun mail n'est envoyé", serveur: "smtp.exemple.fr", port: "587", ssl: "true", authentification: "compte@exemple.fr (mot de passe renseigné)", expediteur: "suivi-mailles@exemple.fr" } };
     },
     async supprimerUtilisateur(email) {
       const liste = utilisateursDemo();
@@ -1088,6 +1097,34 @@
         toast(`${u.email} supprimé`);
       },
     });
+  });
+
+  $("#tester-mail").addEventListener("click", async () => {
+    const btn = $("#tester-mail");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours…";
+    try {
+      const r = await store.testerMail();
+      const p = r.parametres || {};
+      $("#resultat-test").innerHTML = `
+        <p class="connexion-message ${r.ok ? "info" : "erreur"}">${r.ok
+          ? `Le serveur SMTP a accepté le mail de test pour <b>${esc(r.destinataire)}</b>. S'il n'arrive pas d'ici quelques minutes, il est bloqué après le serveur : regardez les courriers indésirables ou la quarantaine, et vérifiez que l'expéditeur est autorisé.`
+          : `Échec de l'envoi à <b>${esc(r.destinataire)}</b> : ${esc(r.detail)}`}</p>
+        <dl class="conf-detail">
+          <dt>Mode</dt><dd>${esc(p.mode ?? "")}</dd>
+          <dt>Serveur</dt><dd>${esc(p.serveur ?? "(vide)")}</dd>
+          <dt>Port</dt><dd>${esc(p.port ?? "(vide : 25)")}</dd>
+          <dt>Ssl</dt><dd>${esc(p.ssl ?? "(vide : false)")}</dd>
+          <dt>Authentification</dt><dd>${esc(p.authentification ?? "")}</dd>
+          <dt>Expéditeur</dt><dd>${esc(p.expediteur ?? "(vide)")}</dd>
+        </dl>`;
+      $("#resultat-test").hidden = false;
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Tester l'envoi des mails";
+    }
   });
 
   // --- Connexion par code envoyé par mail -------------------------------------------

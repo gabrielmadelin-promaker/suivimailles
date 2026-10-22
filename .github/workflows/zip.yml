@@ -92,11 +92,14 @@ jobs:
           curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"siren":"111222333","nom":"Sans maille"}' http://127.0.0.1:5080/api/societes | jq -e '.nbMailles == 0'
           curl -sf -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | grep -q 111222333
           curl -sI -b /tmp/admin.txt http://127.0.0.1:5080/api/siren.csv | grep -qi "cache-control: no-store"
+          # Diagnostic SMTP (mode dossier de test) : le mail de test est déposé.
+          curl -sf -b /tmp/admin.txt -X POST $U/api/utilisateurs/test-mail | jq -e '.ok and (.parametres.mode | test("dossier de test"))'
           # Utilisateurs : création d'un profil User, accès refusé à la gestion des utilisateurs.
           curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"email":"agent@test.local","nom":"Agent","profil":"User"}' $U/api/utilisateurs | jq -e '.profil == "User"'
           connexion agent@test.local /tmp/agent.txt | jq -e '.profil == "User"'
           test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 200
           test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/utilisateurs)" = 403
+          test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' -X POST $U/api/utilisateurs/test-mail)" = 403
           jq -e '.[] | select(.id == "0001") | .modifiePar == "admin@test.local"' App_Data/mailles.json
           # Garde-fous : pas d'auto-suppression ni de perte du dernier administrateur.
           test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local"}' $U/api/utilisateurs/supprimer)" = 400
