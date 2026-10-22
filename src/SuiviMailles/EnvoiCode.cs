@@ -83,24 +83,30 @@ public sealed class EnvoiCode(IConfiguration config, ILogger<EnvoiCode> logger)
         var expediteur = Expediteur();
         var fin = expiration.ToString("dddd d MMMM yyyy 'à' HH'h'mm", new System.Globalization.CultureInfo("fr-FR"));
 
+        var html = $"""
+            <!DOCTYPE html>
+            <html lang="fr"><head><meta charset="utf-8"></head>
+            <body style="margin:0;padding:16px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1b2230">
+              <p>Bonjour,</p>
+              <p>Voici votre code d'accès à l'application <b>Suivi des mailles</b> :</p>
+              <p style="font-family:Consolas,monospace;font-size:24px;letter-spacing:3px;background:#f2f4f7;padding:12px 16px;display:inline-block;border-radius:6px">{WebUtility.HtmlEncode(code)}</p>
+              <p>Il est valable jusqu'au {WebUtility.HtmlEncode(fin)}. Respectez les majuscules et minuscules.</p>
+              <p style="color:#5d6779">Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>
+            </body></html>
+            """;
+        var texte = $"Bonjour,\r\n\r\nVotre code d'accès à Suivi des mailles : {code}\r\n" +
+                    $"Valable jusqu'au {fin}. Respectez les majuscules et minuscules.\r\n\r\n" +
+                    "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\r\n";
+
+        // Deux versions explicitement typées (multipart/alternative) : texte d'abord, HTML ensuite, que les messageries
+        // affichent en priorité. Pas de propriété Body, qui ferait déclarer le HTML comme du texte brut.
         using var message = new MailMessage(expediteur, new MailAddress(destinataire))
         {
             Subject = "Votre code d'accès - Suivi des mailles",
             SubjectEncoding = Encoding.UTF8,
-            BodyEncoding = Encoding.UTF8,
-            IsBodyHtml = true,
-            Body = $"""
-                <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1b2230">
-                  <p>Bonjour,</p>
-                  <p>Voici votre code d'accès à l'application <b>Suivi des mailles</b> :</p>
-                  <p style="font-family:Consolas,monospace;font-size:24px;letter-spacing:3px;background:#f2f4f7;padding:12px 16px;display:inline-block;border-radius:6px">{WebUtility.HtmlEncode(code)}</p>
-                  <p>Il est valable jusqu'au {WebUtility.HtmlEncode(fin)}. Respectez les majuscules et minuscules.</p>
-                  <p style="color:#5d6779">Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>
-                </div>
-                """,
         };
-        message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
-            $"Votre code d'accès à Suivi des mailles : {code}\r\nValable jusqu'au {fin}.\r\n", Encoding.UTF8, "text/plain"));
+        message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(texte, Encoding.UTF8, "text/plain"));
+        message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(html, Encoding.UTF8, "text/html"));
 
         using var client = Client();
         await client.SendMailAsync(message);

@@ -51,6 +51,8 @@ jobs:
             curl -sf -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\"}" $U/api/auth/code | jq -e '.expiration' >/dev/null
             CODE=$(python3 -c "import email,glob,re; m=email.message_from_file(open(glob.glob('App_Data/mails/*.eml')[0])); t=''.join(p.get_payload(decode=True).decode() for p in m.walk() if p.get_content_type()=='text/plain'); print(re.search(r'Suivi des mailles : (\S{10})', t).group(1))")
             test ${#CODE} = 10
+            # Le mail doit porter une partie HTML déclarée text/html (sinon les messageries affichent le code HTML brut).
+            python3 -c "import email,glob; m=email.message_from_file(open(glob.glob('App_Data/mails/*.eml')[0])); t=[p.get_content_type() for p in m.walk()]; print(t); assert m.get_content_type()=='multipart/alternative' and 'text/html' in t and 'text/plain' in t"
             echo -n "$CODE" > /tmp/dernier-code.txt
             curl -sf -c "$2" -X POST -H "Content-Type: application/json" -d "{\"email\":\"$1\",\"code\":\"$CODE\"}" $U/api/auth/connexion
           }
