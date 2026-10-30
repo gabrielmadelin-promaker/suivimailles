@@ -302,6 +302,8 @@ button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
 .fleche { font-size: 9px; min-width: 9px; }
 
+.filtre.invalide { border-color: var(--nonleg); background: var(--nonleg-bg); }
+
 </style>
 <div id="ecran-connexion" class="connexion" hidden>
   <div class="connexion-carte">
@@ -437,7 +439,8 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
             <tr class="filtres">
               <th><input id="fs-nom" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
               <th><input id="fs-siren" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par SIREN" inputmode="numeric" autocomplete="off"></th>
-              <th></th>
+              <th><input id="fs-nb" class="filtre" type="search" placeholder="ex. 0, &gt;3" aria-label="Filtrer par nombre de mailles"
+                   title="Nombre exact (0 = aucune maille) ou comparaison : >3, <2, >=5, <=1" autocomplete="off"></th>
             </tr>
           </thead>
           <tbody id="lignes-societes"></tbody>
@@ -921,7 +924,7 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
   // --- État ---------------------------------------------------------------
   const etat = {
     mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
-    societes: [], filtresSocietes: { nom: "", siren: "" },
+    societes: [], filtresSocietes: { nom: "", siren: "", nb: "" },
     // Tri de la liste des sociétés : colonne (nom, siren, nbMailles) et sens (1 croissant, -1 décroissant) ; null = ordre par défaut.
     triSocietes: { colonne: null, sens: 1 },
     moi: null, utilisateurs: [],
@@ -1458,9 +1461,21 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
       (nbVisibles !== total ? ` · ${nbVisibles} affichée${nbVisibles > 1 ? "s" : ""}` : "");
   }
 
+  // Filtre sur le nombre de mailles : « 3 » (exact), « >3 », « <2 », « >=5 », « <=1 » ; vide = tout.
+  function filtreNombre(saisie) {
+    const t = String(saisie || "").replace(/\s/g, "").replace("≥", ">=").replace("≤", "<=");
+    if (!t) return () => true;
+    const m = t.match(/^(>=|<=|>|<|=)?(\d+)$/);
+    if (!m) { const tout = () => true; tout.invalide = true; return tout; }
+    const n = Number(m[2]);
+    return { ">=": v => v >= n, "<=": v => v <= n, ">": v => v > n, "<": v => v < n }[m[1]] ?? (v => v === n);
+  }
+
   function rendreSocietes() {
     const f = etat.filtresSocietes;
-    const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
+    const testNb = filtreNombre(f.nb);
+    const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)) && testNb(s.nbMailles));
+    $("#fs-nb").classList.toggle("invalide", testNb.invalide === true);
     const { colonne, sens } = etat.triSocietes;
     if (colonne) {
       const cmp = {
@@ -1520,7 +1535,7 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
     rendreSocietes();
   });
 
-  for (const champ of ["nom", "siren"]) {
+  for (const champ of ["nom", "siren", "nb"]) {
     $(`#fs-${champ}`).addEventListener("input", e => { etat.filtresSocietes[champ] = e.target.value; rendreSocietes(); });
   }
 
