@@ -5,6 +5,8 @@
     { code: "nouveau", libelle: "Nouveau" },
     { code: "legitime", libelle: "Légitime" },
     { code: "non_legitime", libelle: "Non légitime" },
+    { code: "a_supprimer", libelle: "À supprimer" },
+    { code: "supprimee", libelle: "Supprimée" },
   ];
   const libelleStatut = Object.fromEntries(STATUTS.map(s => [s.code, s.libelle]));
 
@@ -712,7 +714,7 @@
 
   function classeurMailles(mailles) {
     // Styles : 1 = en-tête, 2/3/4 = statut Nouveau / Légitime / Non légitime (couleurs de l'application).
-    const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4 };
+    const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4, a_supprimer: 5, supprimee: 6 };
     const colonnes = [["Société", 34], ["SIREN", 13], ["Maille", 42], ["Statut", 15], ["Modifié le", 17], ["Modifié par", 22]];
     const lettres = "ABCDEF";
     const cellule = (ref, valeur, style = 0) =>
@@ -736,19 +738,23 @@
 </worksheet>`;
     const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font>
+<fonts count="7"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="11"/><color rgb="FF1F5FD1"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF1D7A45"/><name val="Calibri"/></font>
-<font><b/><sz val="11"/><color rgb="FFC0322B"/><name val="Calibri"/></font></fonts>
-<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<font><b/><sz val="11"/><color rgb="FFC0322B"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color rgb="FFB45309"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF5D6779"/><name val="Calibri"/></font></fonts>
+<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE8EBF0"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6EEFC"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFE3F3E9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBE8E6"/></patternFill></fill></fills>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE3F3E9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBE8E6"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFDEBD8"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFECEEF2"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
 <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
 <xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
-<xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
+<xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="5" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="6" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
     return zip({

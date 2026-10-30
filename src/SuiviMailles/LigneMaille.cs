@@ -18,8 +18,10 @@ public static class Statuts
     public const string Nouveau = "nouveau";
     public const string Legitime = "legitime";
     public const string NonLegitime = "non_legitime";
+    public const string ASupprimer = "a_supprimer";
+    public const string Supprimee = "supprimee";
 
-    public static readonly IReadOnlySet<string> Tous = new HashSet<string> { Nouveau, Legitime, NonLegitime };
+    public static readonly IReadOnlySet<string> Tous = new HashSet<string> { Nouveau, Legitime, NonLegitime, ASupprimer, Supprimee };
 }
 
 public sealed record ChangementStatut([property: JsonPropertyName("statut")] string Statut);

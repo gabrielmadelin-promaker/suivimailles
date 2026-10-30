@@ -1,7 +1,8 @@
 # Suivi des mailles
 
 Application web qui liste les mailles (Société, SIREN, Maille, Statut) et permet de qualifier chacune :
-**Nouveau** (bleu), **Légitime** (vert), **Non légitime** (rouge).
+**Nouveau** (bleu), **Légitime** (vert), **Non légitime** (rouge),
+**À supprimer** (orange) et **Supprimée** (gris).
 
 - Filtre sur chaque colonne (insensible à la casse et aux accents ; le SIREN se filtre avec ou sans espaces).
 - Bandeau au-dessus de la liste : nombre et part de mailles par statut. Il suit les filtres Société / SIREN / Maille ;
@@ -57,7 +58,7 @@ Navigateur ──HTTP──▶ IIS (ASP.NET Core Module V2, in-process)
 | `GET  api/auth/moi`, `POST api/auth/deconnexion` | Session en cours, déconnexion |
 | `GET/POST api/utilisateurs`, `POST api/utilisateurs/supprimer` | Gestion des utilisateurs (Admin) |
 | `GET  api/mailles` | Liste des mailles |
-| `POST api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`) |
+| `POST api/mailles/{id}/statut` — corps `{"statut":"legitime"}` | Change le statut (`nouveau`, `legitime`, `non_legitime`, `a_supprimer`, `supprimee`) |
 | `POST api/mailles/{id}/supprimer` | Supprime une maille |
 | `GET  api/societes` | Référentiel des sociétés (SIREN, nom, nombre de mailles) |
 | `POST api/societes` — corps `{"siren":"055804124","nom":"…"}` | Crée ou renomme une société (nom reporté sur ses mailles) |

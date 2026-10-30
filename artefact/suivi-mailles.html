@@ -14,6 +14,8 @@
   --nouveau: #1f5fd1;   --nouveau-bg: #e6eefc;
   --legitime: #1d7a45;  --legitime-bg: #e3f3e9;
   --nonleg: #c0322b;    --nonleg-bg: #fbe8e6;
+  --asupp: #b45309;     --asupp-bg: #fdebd8;
+  --supp: #5d6779;      --supp-bg: #eceef2;
   --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", Consolas, ui-monospace, monospace;
 }
@@ -21,12 +23,14 @@
   :root:not([data-theme="light"]) {
     --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2a323e; --line-strong: #3a4452; --focus: #7ea2ff;
     --nouveau: #7ea8ff; --nouveau-bg: #1c2b4a; --legitime: #5fcf8d; --legitime-bg: #173426; --nonleg: #ff8a80; --nonleg-bg: #42201e;
+    --asupp: #ffad5c; --asupp-bg: #45290f; --supp: #a3acba; --supp-bg: #2a303a;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2a323e; --line-strong: #3a4452; --focus: #7ea2ff;
   --nouveau: #7ea8ff; --nouveau-bg: #1c2b4a; --legitime: #5fcf8d; --legitime-bg: #173426; --nonleg: #ff8a80; --nonleg-bg: #42201e;
+    --asupp: #ffad5c; --asupp-bg: #45290f; --supp: #a3acba; --supp-bg: #2a303a;
   color-scheme: dark;
 }
 
@@ -61,7 +65,10 @@ h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; text
 .barre .nouveau { background: var(--nouveau); }
 .barre .legitime { background: var(--legitime); }
 .barre .non_legitime { background: var(--nonleg); }
-.compteurs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.barre .a_supprimer { background: var(--asupp); }
+.barre .supprimee { background: var(--supp); }
+.compteurs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 900px) { .compteurs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .compteur {
   font: inherit; color: inherit; text-align: left; cursor: pointer;
   background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
@@ -76,6 +83,8 @@ h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; text
 .compteur.nouveau { color: var(--nouveau); }
 .compteur.legitime { color: var(--legitime); }
 .compteur.non_legitime { color: var(--nonleg); }
+.compteur.a_supprimer { color: var(--asupp); }
+.compteur.supprimee { color: var(--supp); }
 
 /* Liste */
 .liste { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
@@ -114,6 +123,8 @@ select.statut {
 select.statut.nouveau { color: var(--nouveau); background-color: var(--nouveau-bg); border-color: color-mix(in srgb, var(--nouveau) 35%, transparent); }
 select.statut.legitime { color: var(--legitime); background-color: var(--legitime-bg); border-color: color-mix(in srgb, var(--legitime) 35%, transparent); }
 select.statut.non_legitime { color: var(--nonleg); background-color: var(--nonleg-bg); border-color: color-mix(in srgb, var(--nonleg) 35%, transparent); }
+select.statut.a_supprimer { color: var(--asupp); background-color: var(--asupp-bg); border-color: color-mix(in srgb, var(--asupp) 35%, transparent); }
+select.statut.supprimee { color: var(--supp); background-color: var(--supp-bg); border-color: color-mix(in srgb, var(--supp) 35%, transparent); }
 select.statut option { color: var(--fg); background: var(--surface); }
 select.statut[aria-busy="true"] { opacity: .6; }
 
@@ -125,7 +136,7 @@ select.statut[aria-busy="true"] { opacity: .6; }
   max-width: calc(100% - 32px);
 }
 @media (max-width: 560px) {
-  .compteurs { grid-template-columns: 1fr; }
+  .compteurs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compteur .nb { font-size: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .barre span { transition: none; } }
@@ -196,6 +207,8 @@ button.supprimer:focus-visible { outline: 2px solid var(--focus); outline-offset
 .pastille-statut.nouveau { color: var(--nouveau); background: var(--nouveau-bg); }
 .pastille-statut.legitime { color: var(--legitime); background: var(--legitime-bg); }
 .pastille-statut.non_legitime { color: var(--nonleg); background: var(--nonleg-bg); }
+.pastille-statut.a_supprimer { color: var(--asupp); background: var(--asupp-bg); }
+.pastille-statut.supprimee { color: var(--supp); background: var(--supp-bg); }
 .avertissement { margin: 0; color: var(--nonleg); background: var(--nonleg-bg); border-radius: 6px; padding: 10px 12px; font-size: 13px; }
 .fenetre-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .btn.danger { background: var(--nonleg); border-color: var(--nonleg); color: var(--surface); font-weight: 500; }
@@ -346,7 +359,7 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
       <span id="total" class="total"></span>
     </div>
     <div class="barre" aria-hidden="true">
-      <span class="nouveau"></span><span class="legitime"></span><span class="non_legitime"></span>
+      <span class="nouveau"></span><span class="legitime"></span><span class="non_legitime"></span><span class="a_supprimer"></span><span class="supprimee"></span>
     </div>
     <div class="compteurs">
       <button type="button" class="compteur nouveau" data-statut="nouveau" aria-pressed="false" title="Filtrer sur ce statut">
@@ -357,6 +370,12 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
       </button>
       <button type="button" class="compteur non_legitime" data-statut="non_legitime" aria-pressed="false" title="Filtrer sur ce statut">
         <span class="pastille"></span><span class="lib">Non légitime</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur a_supprimer" data-statut="a_supprimer" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">À supprimer</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur supprimee" data-statut="supprimee" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">Supprimée</span><span class="nb">–</span>
       </button>
     </div>
   </section>
@@ -383,6 +402,8 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
                 <option value="nouveau">Nouveau</option>
                 <option value="legitime">Légitime</option>
                 <option value="non_legitime">Non légitime</option>
+                <option value="a_supprimer">À supprimer</option>
+                <option value="supprimee">Supprimée</option>
               </select>
             </th>
             <th></th>
@@ -609,6 +630,8 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
     { code: "nouveau", libelle: "Nouveau" },
     { code: "legitime", libelle: "Légitime" },
     { code: "non_legitime", libelle: "Non légitime" },
+    { code: "a_supprimer", libelle: "À supprimer" },
+    { code: "supprimee", libelle: "Supprimée" },
   ];
   const libelleStatut = Object.fromEntries(STATUTS.map(s => [s.code, s.libelle]));
 
@@ -1316,7 +1339,7 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
 
   function classeurMailles(mailles) {
     // Styles : 1 = en-tête, 2/3/4 = statut Nouveau / Légitime / Non légitime (couleurs de l'application).
-    const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4 };
+    const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4, a_supprimer: 5, supprimee: 6 };
     const colonnes = [["Société", 34], ["SIREN", 13], ["Maille", 42], ["Statut", 15], ["Modifié le", 17], ["Modifié par", 22]];
     const lettres = "ABCDEF";
     const cellule = (ref, valeur, style = 0) =>
@@ -1340,19 +1363,23 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
 </worksheet>`;
     const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font>
+<fonts count="7"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="11"/><color rgb="FF1F5FD1"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF1D7A45"/><name val="Calibri"/></font>
-<font><b/><sz val="11"/><color rgb="FFC0322B"/><name val="Calibri"/></font></fonts>
-<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<font><b/><sz val="11"/><color rgb="FFC0322B"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color rgb="FFB45309"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF5D6779"/><name val="Calibri"/></font></fonts>
+<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE8EBF0"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6EEFC"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFE3F3E9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBE8E6"/></patternFill></fill></fills>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE3F3E9"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBE8E6"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFDEBD8"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFECEEF2"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
 <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
 <xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
-<xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
+<xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="5" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="6" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
     return zip({

@@ -66,7 +66,7 @@
       <span id="total" class="total"></span>
     </div>
     <div class="barre" aria-hidden="true">
-      <span class="nouveau"></span><span class="legitime"></span><span class="non_legitime"></span>
+      <span class="nouveau"></span><span class="legitime"></span><span class="non_legitime"></span><span class="a_supprimer"></span><span class="supprimee"></span>
     </div>
     <div class="compteurs">
       <button type="button" class="compteur nouveau" data-statut="nouveau" aria-pressed="false" title="Filtrer sur ce statut">
@@ -77,6 +77,12 @@
       </button>
       <button type="button" class="compteur non_legitime" data-statut="non_legitime" aria-pressed="false" title="Filtrer sur ce statut">
         <span class="pastille"></span><span class="lib">Non légitime</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur a_supprimer" data-statut="a_supprimer" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">À supprimer</span><span class="nb">–</span>
+      </button>
+      <button type="button" class="compteur supprimee" data-statut="supprimee" aria-pressed="false" title="Filtrer sur ce statut">
+        <span class="pastille"></span><span class="lib">Supprimée</span><span class="nb">–</span>
       </button>
     </div>
   </section>
@@ -103,6 +109,8 @@
                 <option value="nouveau">Nouveau</option>
                 <option value="legitime">Légitime</option>
                 <option value="non_legitime">Non légitime</option>
+                <option value="a_supprimer">À supprimer</option>
+                <option value="supprimee">Supprimée</option>
               </select>
             </th>
             <th></th>
