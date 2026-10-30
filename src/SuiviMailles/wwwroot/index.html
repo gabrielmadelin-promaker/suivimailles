@@ -126,7 +126,10 @@
     <section class="liste" aria-label="Liste des sociétés">
       <div class="liste-tete">
         <span id="compte-societes" class="affiches">Chargement…</span>
-        <span class="sub">Le nom saisi est reporté sur toutes les mailles du SIREN.</span>
+        <div class="actions">
+          <span class="sub">Le nom saisi est reporté sur toutes les mailles du SIREN.</span>
+          <button id="exporter-societes" class="btn principal" type="button">Exporter vers Excel</button>
+        </div>
       </div>
       <form id="form-societe" class="ajout-societe" novalidate>
         <input id="ajout-nom" class="filtre" type="text" placeholder="Nom de la société" aria-label="Nom de la nouvelle société" autocomplete="off">

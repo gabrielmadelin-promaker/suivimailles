@@ -342,7 +342,7 @@
     const perimetre = etat.mailles.filter(m => correspond(m, f));
     const visibles = f.statut ? perimetre.filter(m => m.statut === f.statut) : perimetre;
     $("#exporter-excel").textContent = visibles.length === etat.mailles.length
-      ? "Exporter vers Excel" : `Exporter les ${visibles.length} lignes vers Excel`;
+      ? "Exporter vers Excel" : visibles.length === 1 ? "Exporter la ligne vers Excel" : `Exporter les ${visibles.length} lignes vers Excel`;
     $("#exporter-excel").disabled = !visibles.length;
 
     const total = perimetre.length;
@@ -712,29 +712,36 @@
     return isNaN(d) ? "" : d.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
   };
 
+  // Classeur Excel d'une feuille : colonnes [titre, largeur], lignes de cellules (texte, nombre ou { v, s } avec un style).
+  // Styles : 1 = en-tête, 2 à 6 = statuts Nouveau, Légitime, Non légitime, À supprimer, Supprimée.
+  const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4, a_supprimer: 5, supprimee: 6 };
+  const lettre = i => String.fromCharCode(65 + i);
+
   function classeurMailles(mailles) {
-    // Styles : 1 = en-tête, 2/3/4 = statut Nouveau / Légitime / Non légitime (couleurs de l'application).
-    const styleStatut = { nouveau: 2, legitime: 3, non_legitime: 4, a_supprimer: 5, supprimee: 6 };
-    const colonnes = [["Société", 34], ["SIREN", 13], ["Maille", 42], ["Statut", 15], ["Modifié le", 17], ["Modifié par", 22]];
-    const lettres = "ABCDEF";
-    const cellule = (ref, valeur, style = 0) =>
-      `<c r="${ref}" t="inlineStr"${style ? ` s="${style}"` : ""}><is><t xml:space="preserve">${xml(valeur)}</t></is></c>`;
+    // Le SIREN reste du texte pour garder les zéros en tête.
+    return classeur("Mailles", [["Société", 34], ["SIREN", 13], ["Maille", 42], ["Statut", 15], ["Modifié le", 17], ["Modifié par", 22]],
+      mailles.map(m => [m.societe, m.siren, m.maille, { v: libelleStatut[m.statut] ?? m.statut, s: styleStatut[m.statut] }, dateFr(m.modifieLe), m.modifiePar ?? ""]));
+  }
+
+  function classeur(nomFeuille, colonnes, donnees) {
+    const cellule = (ref, c, style = 0) => {
+      const { v, s } = c !== null && typeof c === "object" ? c : { v: c, s: style };
+      const st = s ? ` s="${s}"` : "";
+      return typeof v === "number"
+        ? `<c r="${ref}"${st}><v>${v}</v></c>`
+        : `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
+    };
     const lignes = [
-      `<row r="1">${colonnes.map(([titre], i) => cellule(`${lettres[i]}1`, titre, 1)).join("")}</row>`,
-      ...mailles.map((m, i) => {
-        const r = i + 2;
-        // Le SIREN reste du texte pour garder les zéros en tête.
-        return `<row r="${r}">${cellule(`A${r}`, m.societe)}${cellule(`B${r}`, m.siren)}${cellule(`C${r}`, m.maille)}` +
-          `${cellule(`D${r}`, libelleStatut[m.statut] ?? m.statut, styleStatut[m.statut])}${cellule(`E${r}`, dateFr(m.modifieLe))}${cellule(`F${r}`, m.modifiePar)}</row>`;
-      }),
+      `<row r="1">${colonnes.map(([titre], i) => cellule(`${lettre(i)}1`, titre, 1)).join("")}</row>`,
+      ...donnees.map((ligne, i) => `<row r="${i + 2}">${ligne.map((c, j) => cellule(`${lettre(j)}${i + 2}`, c)).join("")}</row>`),
     ];
-    const derniere = mailles.length + 1;
+    const derniere = donnees.length + 1, fin = lettre(colonnes.length - 1);
     const feuille = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
 <cols>${colonnes.map(([, l], i) => `<col min="${i + 1}" max="${i + 1}" width="${l}" customWidth="1"/>`).join("")}</cols>
 <sheetData>${lignes.join("")}</sheetData>
-<autoFilter ref="A1:F${derniere}"/>
+<autoFilter ref="A1:${fin}${derniere}"/>
 </worksheet>`;
     const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -772,8 +779,8 @@
 </Relationships>`,
       "xl/workbook.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Mailles" sheetId="1" r:id="rId1"/></sheets>
-<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Mailles!$A$1:$F$${derniere}</definedName></definedNames>
+<sheets><sheet name="${nomFeuille}" sheetId="1" r:id="rId1"/></sheets>
+<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">${nomFeuille}!$A$1:$${fin}$${derniere}</definedName></definedNames>
 </workbook>`,
       "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -833,7 +840,8 @@
       (nbVisibles !== total ? ` · ${nbVisibles} affichée${nbVisibles > 1 ? "s" : ""}` : "");
   }
 
-  function rendreSocietes() {
+  // Sociétés affichées : filtres et tri de l'écran (repris tels quels par l'export Excel).
+  function societesAffichees() {
     const f = etat.filtresSocietes;
     const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
     const { colonne, sens } = etat.triSocietes;
@@ -846,6 +854,16 @@
       // À égalité, ordre alphabétique pour garder une liste stable.
       visibles.sort((a, b) => sens * cmp(a, b) || (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr") || a.siren.localeCompare(b.siren));
     }
+    return visibles;
+  }
+
+  function rendreSocietes() {
+    const f = etat.filtresSocietes;
+    const { colonne, sens } = etat.triSocietes;
+    const visibles = societesAffichees();
+    $("#exporter-societes").textContent = visibles.length === etat.societes.length
+      ? "Exporter vers Excel" : visibles.length === 1 ? "Exporter la société vers Excel" : `Exporter les ${visibles.length} sociétés vers Excel`;
+    $("#exporter-societes").disabled = !visibles.length;
     for (const th of document.querySelectorAll(".table-societes th[data-tri]")) {
       const actif = th.dataset.tri === colonne;
       th.setAttribute("aria-sort", actif ? (sens > 0 ? "ascending" : "descending") : "none");
@@ -881,6 +899,20 @@
     rendreExport();
     return vue;
   }
+
+  // Export Excel des sociétés affichées, avec le nombre de mailles par statut.
+  $("#exporter-societes").addEventListener("click", async () => {
+    const societes = societesAffichees();
+    if (!societes.length) { toast("Aucune société à exporter avec ces filtres."); return; }
+    const parSiren = {};
+    for (const m of etat.mailles) (parSiren[m.siren] ??= {})[m.statut] = ((parSiren[m.siren] ??= {})[m.statut] ?? 0) + 1;
+    const blob = classeur("Sociétés",
+      [["Société", 34], ["SIREN", 13], ["Mailles", 10], ...STATUTS.map(st => [st.libelle, 14])],
+      societes.map(so => [so.nom, so.siren, so.nbMailles, ...STATUTS.map(st => parSiren[so.siren]?.[st.code] ?? 0)]));
+    const jour = new Date().toISOString().slice(0, 10);
+    if (await telecharger(`societes-${jour}.xlsx`, blob))
+      toast(`${societes.length} société${societes.length > 1 ? "s" : ""} exportée${societes.length > 1 ? "s" : ""} vers Excel`);
+  });
 
   // Clic sur un en-tête : tri sur la colonne, puis sens inverse, puis retour à l'ordre par défaut.
   // Le nombre de mailles se trie d'abord du plus grand au plus petit.
