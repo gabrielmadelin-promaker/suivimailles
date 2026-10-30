@@ -849,7 +849,8 @@
     for (const th of document.querySelectorAll(".table-societes th[data-tri]")) {
       const actif = th.dataset.tri === colonne;
       th.setAttribute("aria-sort", actif ? (sens > 0 ? "ascending" : "descending") : "none");
-      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "";
+      // Double flèche grise tant que la colonne n'est pas triée : elle signale que l'en-tête est cliquable.
+      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "⇅";
     }
     compterSocietes(visibles.length);
     $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `

@@ -297,10 +297,11 @@ button.tri {
   font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; font-weight: inherit;
   background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
 }
-button.tri:hover { color: var(--fg); }
+button.tri:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
-.fleche { font-size: 9px; min-width: 9px; }
+.fleche { font-size: 11px; min-width: 11px; color: var(--muted); opacity: .7; }
+th[aria-sort="ascending"] .fleche, th[aria-sort="descending"] .fleche { color: inherit; opacity: 1; font-size: 9px; }
 
 </style>
 <div id="ecran-connexion" class="connexion" hidden>
@@ -430,9 +431,9 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
         <table class="table-societes">
           <thead>
             <tr>
-              <th scope="col" data-tri="nom" aria-sort="none"><button type="button" class="tri" title="Trier par société">Société <span class="fleche" aria-hidden="true"></span></button></th>
-              <th scope="col" data-tri="siren" aria-sort="none"><button type="button" class="tri" title="Trier par SIREN">SIREN <span class="fleche" aria-hidden="true"></span></button></th>
-              <th scope="col" class="col-nb" data-tri="nbMailles" aria-sort="none"><button type="button" class="tri" title="Trier par nombre de mailles">Mailles <span class="fleche" aria-hidden="true"></span></button></th>
+              <th scope="col" data-tri="nom" aria-sort="none"><button type="button" class="tri" title="Trier par société">Société <span class="fleche" aria-hidden="true">⇅</span></button></th>
+              <th scope="col" data-tri="siren" aria-sort="none"><button type="button" class="tri" title="Trier par SIREN">SIREN <span class="fleche" aria-hidden="true">⇅</span></button></th>
+              <th scope="col" class="col-nb" data-tri="nbMailles" aria-sort="none"><button type="button" class="tri" title="Trier par nombre de mailles">Mailles <span class="fleche" aria-hidden="true">⇅</span></button></th>
             </tr>
             <tr class="filtres">
               <th><input id="fs-nom" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
@@ -1474,7 +1475,8 @@ th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { co
     for (const th of document.querySelectorAll(".table-societes th[data-tri]")) {
       const actif = th.dataset.tri === colonne;
       th.setAttribute("aria-sort", actif ? (sens > 0 ? "ascending" : "descending") : "none");
-      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "";
+      // Double flèche grise tant que la colonne n'est pas triée : elle signale que l'en-tête est cliquable.
+      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "⇅";
     }
     compterSocietes(visibles.length);
     $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `

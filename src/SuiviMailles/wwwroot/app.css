@@ -293,7 +293,8 @@ button.tri {
   font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; font-weight: inherit;
   background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
 }
-button.tri:hover { color: var(--fg); }
+button.tri:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
-.fleche { font-size: 9px; min-width: 9px; }
+.fleche { font-size: 11px; min-width: 11px; color: var(--muted); opacity: .7; }
+th[aria-sort="ascending"] .fleche, th[aria-sort="descending"] .fleche { color: inherit; opacity: 1; font-size: 9px; }
