@@ -105,13 +105,23 @@ jobs:
           test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/utilisateurs)" = 403
           test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' -X POST $U/api/utilisateurs/test-mail)" = 403
           jq -e '.[] | select(.id == "0001") | .modifiePar == "admin@test.local"' App_Data/mailles.json
+          # Profil Lecteur : lecture seule.
+          curl -sf -b /tmp/admin.txt -X POST -H "Content-Type: application/json" -d '{"email":"lecteur@test.local","profil":"Lecteur"}' $U/api/utilisateurs | jq -e '.profil == "Lecteur"'
+          connexion lecteur@test.local /tmp/lecteur.txt | jq -e '.profil == "Lecteur"'
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 200
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' $U/api/societes)" = 200
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"statut":"legitime"}' $U/api/mailles/0003/statut)" = 403
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"siren":"055804124","nom":"X"}' $U/api/societes)" = 403
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' -X POST $U/api/mailles/0003/supprimer)" = 403
+          test "$(curl -s -b /tmp/lecteur.txt -o /dev/null -w '%{http_code}' $U/api/utilisateurs)" = 403
+          curl -sf -b /tmp/lecteur.txt -c /tmp/lecteur.txt -X POST $U/api/auth/deconnexion
           # Garde-fous : pas d'auto-suppression ni de perte du dernier administrateur.
           test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local"}' $U/api/utilisateurs/supprimer)" = 400
           test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"admin@test.local","profil":"User"}' $U/api/utilisateurs)" = 400
           # Suppression d'un utilisateur : sa session est coupée immédiatement.
           test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"agent@test.local"}' $U/api/utilisateurs/supprimer)" = 204
           test "$(curl -s -b /tmp/agent.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 401
-          test "$(curl -sf -b /tmp/admin.txt $U/api/utilisateurs | jq length)" = 1
+          test "$(curl -sf -b /tmp/admin.txt $U/api/utilisateurs | jq length)" = 2
           curl -sf -b /tmp/admin.txt -c /tmp/admin.txt -X POST $U/api/auth/deconnexion
           test "$(curl -s -b /tmp/admin.txt -o /dev/null -w '%{http_code}' $U/api/mailles)" = 401
           kill $PID

@@ -130,6 +130,7 @@
   const utilisateursDemo = () => lireLocal(CLE_UTILISATEURS, [
     { email: "admin@exemple.fr", nom: "Administrateur", profil: "Admin", derniereConnexion: null },
     { email: "utilisateur@exemple.fr", nom: "Utilisateur", profil: "User", derniereConnexion: null },
+    { email: "lecteur@exemple.fr", nom: "Lecteur", profil: "Lecteur", derniereConnexion: null },
   ]);
   const genererCode = () => {
     const maj = "ABCDEFGHJKLMNPQRSTUVWXYZ", min = "abcdefghijkmnopqrstuvwxyz", chi = "23456789", spe = "!#$%&*+-=?@", tous = maj + min + chi + spe;
@@ -303,6 +304,8 @@
   };
 
   const $ = sel => document.querySelector(sel);
+  // Profil Lecteur : consultation seule (le serveur refuse de toute façon les modifications).
+  const lectureSeule = () => etat.moi?.profil === "Lecteur";
   // Sociétés non renseignées (mailles importées) en fin de liste.
   const tri = (a, b) => (!a.societe - !b.societe) || a.societe.localeCompare(b.societe, "fr") || a.maille.localeCompare(b.maille, "fr");
   const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -369,14 +372,14 @@
         <td class="siren">${surligner(formatSiren(m.siren), f.siren, true)}</td>
         <td class="maille">${surligner(m.maille, f.maille)}</td>
         <td>
-          <select class="statut ${esc(m.statut)}" aria-label="Statut de ${esc(m.maille)} – ${esc(m.societe)}">
+          <select class="statut ${esc(m.statut)}" aria-label="Statut de ${esc(m.maille)} – ${esc(m.societe)}"${lectureSeule() ? " disabled" : ""}>
             ${STATUTS.map(s => `<option value="${s.code}"${s.code === m.statut ? " selected" : ""}>${s.libelle}</option>`).join("")}
           </select>
         </td>
-        <td class="col-actions">
+        <td class="col-actions">${lectureSeule() ? "" : `
           <button type="button" class="supprimer" title="Supprimer cette maille" aria-label="Supprimer ${esc(m.maille)}">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 1.5h4a.5.5 0 0 1 .5.5v1H14v1.5h-1l-.7 9.1a1.5 1.5 0 0 1-1.5 1.4H5.2a1.5 1.5 0 0 1-1.5-1.4L3 4.5H2V3h3.5V2a.5.5 0 0 1 .5-.5Zm-1.5 3 .7 9h5.6l.7-9h-7Zm2 1.5h1v6h-1v-6Zm2 0h1v6h-1v-6Z"/></svg>
-          </button>
+          </button>`}
         </td>
       </tr>`).join("");
   }
@@ -873,7 +876,7 @@
     compterSocietes(visibles.length);
     $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `
       <tr data-siren="${esc(s.siren)}">
-        <td><input class="nom-societe" type="text" value="${esc(s.nom)}" data-initial="${esc(s.nom)}" placeholder="Saisir le nom de la société"
+        <td><input class="nom-societe" type="text" value="${esc(s.nom)}" data-initial="${esc(s.nom)}" placeholder="${lectureSeule() ? "Non renseigné" : "Saisir le nom de la société"}"${lectureSeule() ? " readonly" : ""}
              aria-label="Nom de la société ${esc(formatSiren(s.siren))}" autocomplete="off"></td>
         <td class="siren">${surligner(formatSiren(s.siren), f.siren, true)}</td>
         <td class="nb">${s.nbMailles
@@ -1088,6 +1091,7 @@
         <td><select class="profil-utilisateur" aria-label="Profil de ${esc(u.email)}"${moi ? " disabled title=\"Vous ne pouvez pas modifier votre propre profil\"" : ""}>
           <option value="User"${u.profil === "User" ? " selected" : ""}>User</option>
           <option value="Admin"${u.profil === "Admin" ? " selected" : ""}>Admin</option>
+          <option value="Lecteur"${u.profil === "Lecteur" ? " selected" : ""}>Lecteur</option>
         </select></td>
         <td class="date">${dateHeure(u.derniereConnexion) || '<span class="inconnue">Jamais</span>'}</td>
         <td class="col-actions">${moi ? "" : `<button type="button" class="supprimer" title="Supprimer cet utilisateur" aria-label="Supprimer ${esc(u.email)}">
@@ -1282,10 +1286,13 @@
     $("#application").hidden = false;
     $("#session-email").textContent = u.nom ? `${u.nom} (${u.email})` : u.email;
     $("#session-profil").textContent = u.profil;
-    const admin = u.profil === "Admin";
+    const admin = u.profil === "Admin", lecteur = u.profil === "Lecteur";
     $('.onglet[data-onglet="utilisateurs"]').hidden = !admin;
+    $('.onglet[data-onglet="import"]').hidden = lecteur;
+    $("#form-societe").hidden = lecteur;
+    document.body.classList.toggle("lecture-seule", lecteur);
     const demande = location.hash.slice(1);
-    afficherOnglet(["societes", "import"].includes(demande) || (admin && demande === "utilisateurs") ? demande : "mailles");
+    afficherOnglet(demande === "societes" || (!lecteur && demande === "import") || (admin && demande === "utilisateurs") ? demande : "mailles");
     charger();
   }
 

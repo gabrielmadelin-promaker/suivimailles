@@ -298,3 +298,7 @@ button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
 .fleche { font-size: 11px; min-width: 11px; color: var(--muted); opacity: .7; }
 th[aria-sort="ascending"] .fleche, th[aria-sort="descending"] .fleche { color: inherit; opacity: 1; font-size: 9px; }
+
+/* Profil Lecteur : statuts et noms affichés sans aspect modifiable */
+select.statut:disabled { cursor: default; opacity: 1; background-image: none; padding-right: 12px; }
+input.nom-societe[readonly] { cursor: default; border-color: transparent !important; background: transparent !important; }

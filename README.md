@@ -38,7 +38,8 @@ Application web qui liste les mailles (Société, SIREN, Maille, Statut) et perm
   (majuscule, minuscule, chiffre, caractère spécial) lui est envoyé par mail. Le code est valable jusqu'à 23:59:59 le jour
   même, 5 essais au plus ; un nouveau code remplace le précédent (au plus un par minute). La session expire aussi à minuit.
   Seule l'empreinte SHA-256 du code est conservée (`App_Data/codes.json`).
-- **Profils** : **Admin** (tous les onglets) et **User** (tous sauf Utilisateurs). Le profil est relu à chaque requête :
+- **Profils** : **Admin** (tous les onglets), **User** (tous sauf Utilisateurs) et **Lecteur** (Mailles et Sociétés
+  en consultation seule : filtres, tri, export Excel ; le serveur refuse toute modification). Le profil est relu à chaque requête :
   un changement ou une suppression s'applique immédiatement. Impossible de se supprimer soi-même ou de retirer le dernier Admin.
 - **SMTP** : `App_Data/smtp.json` (modèle `smtp.modele.json`, créé par le script d'installation). `DossierTest` dépose les
   mails en `.eml` au lieu de les envoyer. `Authentification:AdministrateurInitial` crée le premier administrateur.

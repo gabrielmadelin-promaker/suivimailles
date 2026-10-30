@@ -75,6 +75,12 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
         return;
     }
+    // Profil Lecteur : lecture seule (aucune requête de modification acceptée).
+    if (utilisateur.Profil == Profils.Lecteur && !HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
+    {
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
     await next();
 });
 

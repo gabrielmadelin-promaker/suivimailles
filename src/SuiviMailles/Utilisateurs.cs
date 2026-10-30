@@ -9,8 +9,10 @@ public static class Profils
 {
     public const string Admin = "Admin";
     public const string User = "User";
+    /// <summary>Consultation seule : onglets Mailles et Sociétés, aucune modification.</summary>
+    public const string Lecteur = "Lecteur";
 
-    public static readonly IReadOnlySet<string> Tous = new HashSet<string> { Admin, User };
+    public static readonly IReadOnlySet<string> Tous = new HashSet<string> { Admin, User, Lecteur };
 }
 
 public sealed class Utilisateur
