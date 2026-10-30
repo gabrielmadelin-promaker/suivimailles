@@ -295,6 +295,8 @@
   const etat = {
     mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
     societes: [], filtresSocietes: { nom: "", siren: "" },
+    // Tri de la liste des sociétés : colonne (nom, siren, nbMailles) et sens (1 croissant, -1 décroissant) ; null = ordre par défaut.
+    triSocietes: { colonne: null, sens: 1 },
     moi: null, utilisateurs: [],
   };
 
@@ -828,6 +830,21 @@
   function rendreSocietes() {
     const f = etat.filtresSocietes;
     const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
+    const { colonne, sens } = etat.triSocietes;
+    if (colonne) {
+      const cmp = {
+        nom: (a, b) => (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }),
+        siren: (a, b) => a.siren.localeCompare(b.siren),
+        nbMailles: (a, b) => a.nbMailles - b.nbMailles,
+      }[colonne];
+      // À égalité, ordre alphabétique pour garder une liste stable.
+      visibles.sort((a, b) => sens * cmp(a, b) || (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr") || a.siren.localeCompare(b.siren));
+    }
+    for (const th of document.querySelectorAll(".table-societes th[data-tri]")) {
+      const actif = th.dataset.tri === colonne;
+      th.setAttribute("aria-sort", actif ? (sens > 0 ? "ascending" : "descending") : "none");
+      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "";
+    }
     compterSocietes(visibles.length);
     $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `
       <tr data-siren="${esc(s.siren)}">
@@ -857,6 +874,20 @@
     rendreExport();
     return vue;
   }
+
+  // Clic sur un en-tête : tri sur la colonne, puis sens inverse, puis retour à l'ordre par défaut.
+  // Le nombre de mailles se trie d'abord du plus grand au plus petit.
+  document.querySelector(".table-societes thead").addEventListener("click", e => {
+    const btn = e.target.closest("button.tri");
+    if (!btn) return;
+    const col = btn.closest("th").dataset.tri;
+    const premier = col === "nbMailles" ? -1 : 1;
+    const t = etat.triSocietes;
+    if (t.colonne !== col) etat.triSocietes = { colonne: col, sens: premier };
+    else if (t.sens === premier) t.sens = -premier;
+    else etat.triSocietes = { colonne: null, sens: 1 };
+    rendreSocietes();
+  });
 
   for (const champ of ["nom", "siren"]) {
     $(`#fs-${champ}`).addEventListener("input", e => { etat.filtresSocietes[champ] = e.target.value; rendreSocietes(); });

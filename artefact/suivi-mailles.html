@@ -279,6 +279,16 @@ select.profil-utilisateur:disabled { opacity: .7; }
 .profils { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 @media (max-width: 640px) { .ajout-utilisateur { grid-template-columns: 1fr; } }
 
+/* En-têtes triables */
+button.tri {
+  font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; font-weight: inherit;
+  background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+button.tri:hover { color: var(--fg); }
+button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
+.fleche { font-size: 9px; min-width: 9px; }
+
 </style>
 <div id="ecran-connexion" class="connexion" hidden>
   <div class="connexion-carte">
@@ -398,7 +408,11 @@ select.profil-utilisateur:disabled { opacity: .7; }
       <div class="table-wrap">
         <table class="table-societes">
           <thead>
-            <tr><th scope="col">Société</th><th scope="col">SIREN</th><th scope="col" class="col-nb">Mailles</th></tr>
+            <tr>
+              <th scope="col" data-tri="nom" aria-sort="none"><button type="button" class="tri" title="Trier par société">Société <span class="fleche" aria-hidden="true"></span></button></th>
+              <th scope="col" data-tri="siren" aria-sort="none"><button type="button" class="tri" title="Trier par SIREN">SIREN <span class="fleche" aria-hidden="true"></span></button></th>
+              <th scope="col" class="col-nb" data-tri="nbMailles" aria-sort="none"><button type="button" class="tri" title="Trier par nombre de mailles">Mailles <span class="fleche" aria-hidden="true"></span></button></th>
+            </tr>
             <tr class="filtres">
               <th><input id="fs-nom" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par société" autocomplete="off"></th>
               <th><input id="fs-siren" class="filtre" type="search" placeholder="Filtrer…" aria-label="Filtrer par SIREN" inputmode="numeric" autocomplete="off"></th>
@@ -885,6 +899,8 @@ select.profil-utilisateur:disabled { opacity: .7; }
   const etat = {
     mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
     societes: [], filtresSocietes: { nom: "", siren: "" },
+    // Tri de la liste des sociétés : colonne (nom, siren, nbMailles) et sens (1 croissant, -1 décroissant) ; null = ordre par défaut.
+    triSocietes: { colonne: null, sens: 1 },
     moi: null, utilisateurs: [],
   };
 
@@ -1418,6 +1434,21 @@ select.profil-utilisateur:disabled { opacity: .7; }
   function rendreSocietes() {
     const f = etat.filtresSocietes;
     const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
+    const { colonne, sens } = etat.triSocietes;
+    if (colonne) {
+      const cmp = {
+        nom: (a, b) => (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }),
+        siren: (a, b) => a.siren.localeCompare(b.siren),
+        nbMailles: (a, b) => a.nbMailles - b.nbMailles,
+      }[colonne];
+      // À égalité, ordre alphabétique pour garder une liste stable.
+      visibles.sort((a, b) => sens * cmp(a, b) || (!a.nom - !b.nom) || a.nom.localeCompare(b.nom, "fr") || a.siren.localeCompare(b.siren));
+    }
+    for (const th of document.querySelectorAll(".table-societes th[data-tri]")) {
+      const actif = th.dataset.tri === colonne;
+      th.setAttribute("aria-sort", actif ? (sens > 0 ? "ascending" : "descending") : "none");
+      th.querySelector(".fleche").textContent = actif ? (sens > 0 ? "▲" : "▼") : "";
+    }
     compterSocietes(visibles.length);
     $("#lignes-societes").innerHTML = visibles.length ? visibles.map(s => `
       <tr data-siren="${esc(s.siren)}">
@@ -1447,6 +1478,20 @@ select.profil-utilisateur:disabled { opacity: .7; }
     rendreExport();
     return vue;
   }
+
+  // Clic sur un en-tête : tri sur la colonne, puis sens inverse, puis retour à l'ordre par défaut.
+  // Le nombre de mailles se trie d'abord du plus grand au plus petit.
+  document.querySelector(".table-societes thead").addEventListener("click", e => {
+    const btn = e.target.closest("button.tri");
+    if (!btn) return;
+    const col = btn.closest("th").dataset.tri;
+    const premier = col === "nbMailles" ? -1 : 1;
+    const t = etat.triSocietes;
+    if (t.colonne !== col) etat.triSocietes = { colonne: col, sens: premier };
+    else if (t.sens === premier) t.sens = -premier;
+    else etat.triSocietes = { colonne: null, sens: 1 };
+    rendreSocietes();
+  });
 
   for (const champ of ["nom", "siren"]) {
     $(`#fs-${champ}`).addEventListener("input", e => { etat.filtresSocietes[champ] = e.target.value; rendreSocietes(); });

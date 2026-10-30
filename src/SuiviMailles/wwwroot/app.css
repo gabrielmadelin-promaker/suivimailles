@@ -274,3 +274,13 @@ select.profil-utilisateur { font: inherit; font-size: 13px; color: var(--fg); ba
 select.profil-utilisateur:disabled { opacity: .7; }
 .profils { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 @media (max-width: 640px) { .ajout-utilisateur { grid-template-columns: 1fr; } }
+
+/* En-têtes triables */
+button.tri {
+  font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; font-weight: inherit;
+  background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+button.tri:hover { color: var(--fg); }
+button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
+.fleche { font-size: 9px; min-width: 9px; }
