@@ -296,7 +296,7 @@
   // --- État ---------------------------------------------------------------
   const etat = {
     mailles: [], filtres: { societe: "", siren: "", maille: "", statut: "" },
-    societes: [], filtresSocietes: { nom: "", siren: "", nb: "" },
+    societes: [], filtresSocietes: { nom: "", siren: "" },
     // Tri de la liste des sociétés : colonne (nom, siren, nbMailles) et sens (1 croissant, -1 décroissant) ; null = ordre par défaut.
     triSocietes: { colonne: null, sens: 1 },
     moi: null, utilisateurs: [],
@@ -833,21 +833,9 @@
       (nbVisibles !== total ? ` · ${nbVisibles} affichée${nbVisibles > 1 ? "s" : ""}` : "");
   }
 
-  // Filtre sur le nombre de mailles : « 3 » (exact), « >3 », « <2 », « >=5 », « <=1 » ; vide = tout.
-  function filtreNombre(saisie) {
-    const t = String(saisie || "").replace(/\s/g, "").replace("≥", ">=").replace("≤", "<=");
-    if (!t) return () => true;
-    const m = t.match(/^(>=|<=|>|<|=)?(\d+)$/);
-    if (!m) { const tout = () => true; tout.invalide = true; return tout; }
-    const n = Number(m[2]);
-    return { ">=": v => v >= n, "<=": v => v <= n, ">": v => v > n, "<": v => v < n }[m[1]] ?? (v => v === n);
-  }
-
   function rendreSocietes() {
     const f = etat.filtresSocietes;
-    const testNb = filtreNombre(f.nb);
-    const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)) && testNb(s.nbMailles));
-    $("#fs-nb").classList.toggle("invalide", testNb.invalide === true);
+    const visibles = etat.societes.filter(s => norm(s.nom).includes(norm(f.nom)) && sansEspaces(s.siren).includes(sansEspaces(f.siren)));
     const { colonne, sens } = etat.triSocietes;
     if (colonne) {
       const cmp = {
@@ -907,7 +895,7 @@
     rendreSocietes();
   });
 
-  for (const champ of ["nom", "siren", "nb"]) {
+  for (const champ of ["nom", "siren"]) {
     $(`#fs-${champ}`).addEventListener("input", e => { etat.filtresSocietes[champ] = e.target.value; rendreSocietes(); });
   }
 

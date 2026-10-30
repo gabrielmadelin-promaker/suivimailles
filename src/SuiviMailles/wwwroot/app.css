@@ -297,5 +297,3 @@ button.tri:hover { color: var(--fg); }
 button.tri:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 th[aria-sort="ascending"] button.tri, th[aria-sort="descending"] button.tri { color: var(--nouveau); }
 .fleche { font-size: 9px; min-width: 9px; }
-
-.filtre.invalide { border-color: var(--nonleg); background: var(--nonleg-bg); }
